@@ -68,6 +68,9 @@ outputs/
 backups/
 backend/data/hunts/
 backend/uploads/
+!backend/product_knowledge/data/
+backend/product_knowledge/data/*
+!backend/product_knowledge/data/jps_product_templates.json
 *.db
 *.sqlite
 *.sqlite3

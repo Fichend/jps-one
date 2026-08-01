@@ -48,6 +48,7 @@ from graph.evaluate import evaluate_progress, should_continue_hunting, _build_ke
 from observability.cost_tracker import get_tracker, remove_tracker
 from scoring.response_scoring import ensure_jps_scores
 from backcheck.service import export_candidate_backcheck, resolve_backcheck_download
+from product_knowledge.jps_catalog_loader import ProductTemplateError, load_jps_product_template
 
 logger = logging.getLogger(__name__)
 
@@ -1155,7 +1156,16 @@ async def _run_resume_hunt(hunt_id: str, request: ResumeRequest, prior_result: d
 @router.get("/health")
 async def health_check():
     """Health check endpoint."""
-    return {"status": "ok", "service": "jps-one"}
+    try:
+        template = load_jps_product_template()
+    except ProductTemplateError as exc:
+        raise HTTPException(status_code=503, detail="JPS product knowledge template is unavailable") from exc
+    return {
+        "status": "ok",
+        "service": "jps-one",
+        "product_knowledge": "ok",
+        "product_families": len(template.get("product_families", [])),
+    }
 
 
 @router.post("/upload", dependencies=[Depends(require_api_access)])
