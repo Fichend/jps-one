@@ -1,0 +1,25 @@
+FROM python:3.11-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+WORKDIR /app
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends build-essential curl ca-certificates \
+    && curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
+    && apt-get install -y --no-install-recommends nodejs \
+    && npm install -g @apify/actors-mcp-server@0.11.7 \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY backend/requirements.txt /app/requirements.txt
+RUN pip install --no-cache-dir --upgrade pip \
+    && pip install --no-cache-dir -r /app/requirements.txt
+
+COPY backend /app
+
+RUN mkdir -p /app/data/hunts /app/uploads
+
+EXPOSE 8000
+
+CMD ["uvicorn", "api.app:app", "--host", "0.0.0.0", "--port", "8000"]

@@ -1,0 +1,2 @@
+"""Knowledge storage namespace."""
+

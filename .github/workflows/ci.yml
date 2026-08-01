@@ -1,0 +1,81 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - name: Install backend dependencies
+        run: python -m pip install --upgrade pip && pip install -r requirements.txt
+      - name: Compile backend
+        run: python -m compileall -q .
+      - name: Run stable core tests
+        run: >-
+          pytest -q
+          tests/test_candidate_pool.py
+          tests/test_candidate_quality.py
+          tests/test_goal_guard.py
+          tests/test_locale_keyword_expander.py
+          tests/test_scoring.py
+          tests/test_tool_executor.py
+          tests/test_backcheck/test_field_mapper.py
+          tests/test_email/test_body_format.py
+          tests/test_email/test_policy.py
+          tests/test_email/test_scheduler.py
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - name: Install Rollup Linux native package
+        run: npm install --no-save @rollup/rollup-linux-x64-gnu@4.57.1
+      - run: npm run build
+
+  repository-safety:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Reject runtime data and private keys
+        shell: bash
+        run: |
+          set -euo pipefail
+          forbidden="$(git ls-files | grep -E '(^|/)(\.env$|.*\.db$|.*\.sqlite[0-9]*$|.*\.pem$|.*\.key$|.*_ed25519(\.pub)?$|data/hunts/|backups/|uploads/|runtime/)' || true)"
+          if [[ -n "$forbidden" ]]; then
+            printf 'Forbidden tracked files:\n%s\n' "$forbidden"
+            exit 1
+          fi
+          if git grep -I -n -E -- '-----BEGIN (OPENSSH|RSA|EC|DSA) PRIVATE KEY-----|AKIA[0-9A-Z]{16}|sk-[A-Za-z0-9_-]{24,}' -- .; then
+            echo "High-confidence credential pattern detected."
+            exit 1
+          fi

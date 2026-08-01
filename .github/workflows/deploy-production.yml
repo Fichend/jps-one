@@ -1,0 +1,77 @@
+name: Deploy production
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      commit_sha:
+        description: Commit SHA to deploy (defaults to the selected branch SHA)
+        required: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: jps-one-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: ${{ vars.EC2_DEPLOY_ENABLED == 'true' }}
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.commit_sha || github.sha }}
+
+      - name: Prepare SSH
+        shell: bash
+        env:
+          EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
+          EC2_KNOWN_HOSTS: ${{ secrets.EC2_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$EC2_SSH_KEY" > ~/.ssh/jps-one-deploy
+          chmod 600 ~/.ssh/jps-one-deploy
+          printf '%s\n' "$EC2_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Upload immutable release
+        shell: bash
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USER: ${{ secrets.EC2_USER }}
+          DEPLOY_SHA: ${{ inputs.commit_sha || github.sha }}
+        run: |
+          set -euo pipefail
+          ssh -i ~/.ssh/jps-one-deploy "$EC2_USER@$EC2_HOST" "mkdir -p /opt/jps-one/releases/$DEPLOY_SHA"
+          rsync -az --delete \
+            --exclude='.git/' \
+            --exclude='.github/' \
+            --exclude='**/.env*' \
+            --exclude='*.db' \
+            --exclude='*.sqlite*' \
+            --exclude='data/' \
+            --exclude='uploads/' \
+            --exclude='runtime/' \
+            --exclude='backups/' \
+            --exclude='outputs/' \
+            --exclude='frontend/node_modules/' \
+            --exclude='frontend/dist/' \
+            -e 'ssh -i ~/.ssh/jps-one-deploy' \
+            ./ "$EC2_USER@$EC2_HOST:/opt/jps-one/releases/$DEPLOY_SHA/"
+
+      - name: Activate and verify release
+        shell: bash
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USER: ${{ secrets.EC2_USER }}
+          DEPLOY_SHA: ${{ inputs.commit_sha || github.sha }}
+        run: |
+          set -euo pipefail
+          ssh -i ~/.ssh/jps-one-deploy "$EC2_USER@$EC2_HOST" \
+            "bash /opt/jps-one/releases/$DEPLOY_SHA/deploy/activate-release.sh '$DEPLOY_SHA'"
+

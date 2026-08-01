@@ -1,0 +1,2 @@
+"""WhatsApp connector namespace."""
+
