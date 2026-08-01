@@ -1,0 +1,106 @@
+{
+  "version": "2026-07-23",
+  "source": "获客评分标准.xlsx",
+  "total_points": 100,
+  "grade_thresholds": {
+    "A": 80,
+    "B": 60,
+    "C": 40,
+    "D": 0
+  },
+  "dimensions": [
+    {
+      "id": "registered_company_name",
+      "label": "完整公司注册名称",
+      "max_points": 10,
+      "rules": [
+        { "condition": "official_suffix_or_strong_company_name", "points": 10, "reason": "完整官方注册名或明确机构名称" },
+        { "condition": "short_company_name", "points": 5, "reason": "名称较短或疑似简称" },
+        { "condition": "missing", "points": 0, "reason": "无正规名称" }
+      ]
+    },
+    {
+      "id": "business_email",
+      "label": "企业邮箱",
+      "max_points": 12,
+      "rules": [
+        { "condition": "domain_email", "points": 12, "reason": "公司域名邮箱" },
+        { "condition": "public_email", "points": 6, "reason": "公共邮箱" },
+        { "condition": "missing", "points": 0, "reason": "无邮箱" }
+      ]
+    },
+    {
+      "id": "phone",
+      "label": "联系电话",
+      "max_points": 12,
+      "rules": [
+        { "condition": "multiple_or_whatsapp_or_social_contact", "points": 12, "reason": "多个电话或有 WhatsApp/社媒联系通道" },
+        { "condition": "single_phone", "points": 6, "reason": "单一号码" },
+        { "condition": "missing", "points": 0, "reason": "无电话" }
+      ]
+    },
+    {
+      "id": "product_match",
+      "label": "主营产品匹配度",
+      "max_points": 16,
+      "rules": [
+        { "condition": "dental_or_medical_consumables_distributor", "points": 16, "reason": "主营牙科/医疗耗材经销或目标采购机构" },
+        { "condition": "mixed_medical_or_cssd", "points": 8, "reason": "综合医疗附带牙科/CSSD 消毒供应中心系列" },
+        { "condition": "clinic_end_user", "points": 3, "reason": "诊所终端自用" },
+        { "condition": "unrelated", "points": 0, "reason": "不相关或证据不足" }
+      ]
+    },
+    {
+      "id": "website",
+      "label": "公司官网",
+      "max_points": 10,
+      "rules": [
+        { "condition": "independent_website", "points": 10, "reason": "独立官网" },
+        { "condition": "social_only", "points": 4, "reason": "仅社交平台主页" },
+        { "condition": "missing", "points": 0, "reason": "无线上展示" }
+      ]
+    },
+    {
+      "id": "company_age",
+      "label": "成立时长",
+      "max_points": 12,
+      "rules": [
+        { "condition": "gte_8_years", "points": 12, "reason": "成立 8 年以上" },
+        { "condition": "three_to_seven_years", "points": 8, "reason": "成立 3-7 年" },
+        { "condition": "one_to_two_years", "points": 3, "reason": "成立 1-2 年" },
+        { "condition": "unknown_or_lt_1_year", "points": 0, "reason": "成立时间未知或小于 1 年" }
+      ]
+    },
+    {
+      "id": "physical_presence",
+      "label": "实体经营形态",
+      "max_points": 10,
+      "rules": [
+        { "condition": "warehouse_or_wholesale_store", "points": 10, "reason": "仓库/门店/批发/地址证据较强" },
+        { "condition": "small_store", "points": 6, "reason": "小型门店零售或有地址但规模未知" },
+        { "condition": "online_only", "points": 3, "reason": "纯线上或仅社媒展示" },
+        { "condition": "unknown", "points": 0, "reason": "无经营形态证据" }
+      ]
+    },
+    {
+      "id": "decision_maker",
+      "label": "决策人信息",
+      "max_points": 8,
+      "rules": [
+        { "condition": "name_and_title", "points": 8, "reason": "采购/负责人姓名和职位" },
+        { "condition": "generic_contact", "points": 4, "reason": "仅通用邮箱或通用联系入口" },
+        { "condition": "missing", "points": 0, "reason": "无人名" }
+      ]
+    },
+    {
+      "id": "compliance_qualification",
+      "label": "合规资质",
+      "max_points": 10,
+      "rules": [
+        { "condition": "medical_import_license", "points": 10, "reason": "本地医疗进口/经销/注册资质证据" },
+        { "condition": "to_be_verified", "points": 5, "reason": "资质待核实或有医疗经销信号" },
+        { "condition": "missing", "points": 0, "reason": "无进口/医疗资质证据" }
+      ]
+    }
+  ]
+}

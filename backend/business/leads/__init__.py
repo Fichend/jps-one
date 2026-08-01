@@ -1,0 +1,2 @@
+"""Lead pool domain."""
+

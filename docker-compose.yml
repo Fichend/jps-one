@@ -1,0 +1,32 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: ai-hunter-backend
+    restart: unless-stopped
+    env_file:
+      - ./backend/.env
+    volumes:
+      - ./backend/.env:/app/.env
+      - ai_hunter_data:/app/data
+      - ai_hunter_uploads:/app/uploads
+      - ai_hunter_runtime:/app/runtime
+    ports:
+      - "127.0.0.1:8000:8000"
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    container_name: ai-hunter-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "127.0.0.1:3000:80"
+
+volumes:
+  ai_hunter_data:
+  ai_hunter_uploads:
+  ai_hunter_runtime:

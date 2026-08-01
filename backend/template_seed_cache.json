@@ -1,0 +1,87 @@
+{
+  "ab764aab3e2af3529ccaf3e72113c2aa0a3c8638fbf3a235c227c796b914bd02": {
+    "source": "pre_generated",
+    "prepared_from": {
+      "website_url": "https://www.gdushun.com/",
+      "description": "Find distributors",
+      "product_keywords": [
+        "micro switch"
+      ],
+      "target_customer_profile": "Distributors",
+      "target_regions": [
+        "United States"
+      ]
+    },
+    "synthetic_buyer": {
+      "company_name": "Distributors",
+      "industry": "Distributors",
+      "description": "Find distributors",
+      "website": "",
+      "country_code": ""
+    },
+    "insight_snapshot": {
+      "company_name": "Guangdong Yushun",
+      "products": [
+        "micro switch"
+      ],
+      "industries": [
+        "Electrical components"
+      ],
+      "value_propositions": [
+        "Factory-direct supply"
+      ],
+      "target_customer_profile": "Distributors",
+      "summary": "Switch manufacturer"
+    },
+    "template_profile": {
+      "source": "user_examples",
+      "tone": "professional",
+      "formality": "professional",
+      "subject_style": "specific and low-pressure",
+      "opening_style": "reference buyer relevance before introducing the seller",
+      "value_prop_style": "focus on buyer fit and concrete use cases",
+      "cta_style": "ask a light qualification question",
+      "claims_to_avoid": [
+        "Avoid unverifiable superlatives",
+        "Avoid sounding like a bulk blast"
+      ],
+      "preferred_structure": [
+        "buyer relevance",
+        "seller introduction",
+        "specific fit angle",
+        "low-friction CTA"
+      ],
+      "example_signals": [
+        "Dear Sir/Madam"
+      ],
+      "template_notes": "Buyer company: Distributors. Industry: Distributors. Relevant products: micro switch."
+    },
+    "template_plan": {
+      "template_source": "user_examples",
+      "recipient_profile": "Distributors",
+      "buyer_relevance_points": [
+        "Distributors",
+        "Find distributors"
+      ],
+      "seller_value_points": [
+        "micro switch"
+      ],
+      "proof_points": [
+        "Factory-direct supply"
+      ],
+      "cta_strategy": "Ask a low-friction qualification question.",
+      "tone_guidance": "professional",
+      "template_instructions": [
+        "Keep the copy concise and commercially credible",
+        "Mention buyer relevance before seller credentials",
+        "Use one clear CTA"
+      ],
+      "claims_to_avoid": [
+        "Avoid unverifiable superlatives",
+        "Avoid sounding like a bulk blast"
+      ],
+      "tone": "professional"
+    },
+    "notes": "Keep it concise"
+  }
+}

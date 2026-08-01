@@ -1,0 +1,64 @@
+{
+  "tools": [
+    {
+      "id": "tavily",
+      "name": "Tavily Web Search",
+      "provider": "tavily",
+      "best_for": ["company website discovery", "industry directory discovery", "public web pages", "news and market signals"],
+      "not_for": ["private social data", "login-only content", "guaranteed direct contact discovery"],
+      "requires": ["TAVILY_API_KEY"],
+      "budget_sensitive": true,
+      "role": "primary",
+      "returned_fields": ["title", "url", "snippet", "source"],
+      "limitations": ["不能保证直接找到邮箱或电话", "不处理登录墙或私密内容"]
+    },
+    {
+      "id": "google_maps",
+      "name": "Google Maps / Serper",
+      "provider": "serper",
+      "best_for": ["local business discovery", "address", "phone", "website", "place metadata"],
+      "not_for": ["private contacts", "deep website extraction"],
+      "requires": ["SERPER_API_KEY"],
+      "budget_sensitive": true,
+      "role": "primary_or_enrichment",
+      "returned_fields": ["company_name", "address", "phone", "website", "rating", "maps_url"],
+      "limitations": ["地图数据更适合本地实体，不等于完整公司资质"]
+    },
+    {
+      "id": "instagram",
+      "name": "Apify Instagram",
+      "provider": "apify",
+      "best_for": ["public business profile discovery", "profile bio", "external website link", "followers and category signals"],
+      "not_for": ["private accounts", "login-only data", "guaranteed email discovery"],
+      "requires": ["APIFY_TOKEN"],
+      "budget_sensitive": true,
+      "role": "supplementary",
+      "returned_fields": ["username", "profile_url", "biography", "external_url", "followers_count", "business_category"],
+      "limitations": ["仅限公开主页和合规场景", "社媒硬条件可能显著减少候选数量"]
+    },
+    {
+      "id": "facebook",
+      "name": "Apify / Meta Facebook",
+      "provider": "apify_or_meta",
+      "best_for": ["public business page discovery", "public page metadata", "authorized Meta asset enrichment"],
+      "not_for": ["private profiles", "arbitrary full-platform private search", "permission-restricted data"],
+      "requires_any": ["APIFY_TOKEN", "META_ACCESS_TOKEN"],
+      "budget_sensitive": true,
+      "role": "supplementary",
+      "returned_fields": ["page_url", "page_name", "about", "website", "phone", "email"],
+      "limitations": ["Meta Graph API 仅用于已授权资产", "公开页面结果取决于平台可见性"]
+    },
+    {
+      "id": "jina_reader",
+      "name": "Jina Reader",
+      "provider": "jina",
+      "best_for": ["public page reading", "website text extraction", "evidence summarization"],
+      "not_for": ["search result discovery", "login-only pages"],
+      "requires": ["JINA_API_KEY"],
+      "budget_sensitive": false,
+      "role": "enrichment",
+      "returned_fields": ["page_text", "summary", "evidence"],
+      "limitations": ["无 Key 时可按现有降级能力尝试，但稳定性较低"]
+    }
+  ]
+}
