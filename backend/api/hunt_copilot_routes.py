@@ -17,12 +17,19 @@ from hunt_copilot.schemas import (
 )
 from hunt_copilot.search_skills import list_search_skills
 from hunt_copilot.service import HuntCopilotService
+from product_knowledge.jps_catalog_loader import ProductTemplateError
 
 router = APIRouter(prefix="/api/v1/hunt-copilot", tags=["hunt-copilot"])
 
 
 def _service() -> HuntCopilotService:
-    return HuntCopilotService()
+    try:
+        return HuntCopilotService()
+    except ProductTemplateError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="JPS product knowledge is unavailable. Check the deployed product template.",
+        ) from exc
 
 
 @router.get("/skills", response_model=SearchSkillsResponse, dependencies=[Depends(require_api_access)])

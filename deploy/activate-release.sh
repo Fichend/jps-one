@@ -10,9 +10,15 @@ SHARED_ENV="$SHARED_DIR/backend.env"
 LEGACY_ENV="/opt/ai-hunter/backend/.env"
 COMPOSE_PROJECT="ai-hunter"
 HEALTH_URL="http://127.0.0.1:8000/api/v1/health"
+PRODUCT_TEMPLATE="$RELEASE_DIR/backend/product_knowledge/data/jps_product_templates.json"
 
 if [[ ! -f "$RELEASE_DIR/docker-compose.yml" ]]; then
   echo "Release is incomplete: $RELEASE_DIR"
+  exit 1
+fi
+
+if [[ ! -s "$PRODUCT_TEMPLATE" ]]; then
+  echo "Release is missing the JPS product knowledge template: $PRODUCT_TEMPLATE"
   exit 1
 fi
 

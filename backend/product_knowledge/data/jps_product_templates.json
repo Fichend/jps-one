@@ -1,0 +1,326 @@
+{
+  "schema_version": 1,
+  "catalogue_version": "2026-08-01",
+  "source_documents": [
+    "JPS Dental Catalogue 2026.pdf",
+    "医疗耗材221104.pdf"
+  ],
+  "default_keywords": [
+    "dental simulator",
+    "phantom head",
+    "dental unit",
+    "dental handpiece",
+    "sterilization pouch"
+  ],
+  "customer_type_aliases": {
+    "dental_school": {
+      "canonical_en": "dental school",
+      "aliases": [
+        "dental school",
+        "dental college",
+        "faculty of dentistry",
+        "dental faculty",
+        "牙科学校",
+        "牙科院校",
+        "口腔院校",
+        "口腔学院"
+      ]
+    },
+    "dental_training_center": {
+      "canonical_en": "dental training center",
+      "aliases": [
+        "dental training center",
+        "dental simulation center",
+        "preclinical dental lab",
+        "牙科培训中心",
+        "口腔培训中心",
+        "牙科模拟中心"
+      ]
+    },
+    "dental_equipment_distributor": {
+      "canonical_en": "dental equipment distributor",
+      "aliases": [
+        "dental equipment distributor",
+        "dental distributor",
+        "dental dealer",
+        "dental supplier",
+        "dental equipment importer",
+        "牙科设备经销商",
+        "牙科经销商",
+        "牙科设备代理商",
+        "牙科器械供应商"
+      ]
+    },
+    "general_dental_clinic": {
+      "canonical_en": "general dental clinic",
+      "aliases": [
+        "general dental clinic",
+        "dental clinic",
+        "individual dentist",
+        "普通牙科诊所",
+        "牙科诊所",
+        "口腔诊所",
+        "个体牙医"
+      ]
+    },
+    "medical_consumables_distributor": {
+      "canonical_en": "medical consumables distributor",
+      "aliases": [
+        "medical consumables distributor",
+        "medical disposables distributor",
+        "medical supplies distributor",
+        "medical consumables importer",
+        "医疗耗材经销商",
+        "医用耗材经销商",
+        "医疗用品经销商",
+        "医疗耗材进口商"
+      ]
+    },
+    "hospital_supplies_distributor": {
+      "canonical_en": "hospital supplies distributor",
+      "aliases": [
+        "hospital supplies distributor",
+        "hospital supplies wholesaler",
+        "hospital consumables supplier",
+        "医院耗材供应商",
+        "医院用品经销商",
+        "医院用品批发商"
+      ]
+    },
+    "medical_wholesaler": {
+      "canonical_en": "medical supplies wholesaler",
+      "aliases": [
+        "medical supplies wholesaler",
+        "medical wholesaler",
+        "pharmacy wholesaler",
+        "医疗用品批发商",
+        "医药批发商",
+        "药房批发商"
+      ]
+    },
+    "hospital": {
+      "canonical_en": "hospital",
+      "aliases": [
+        "hospital",
+        "medical center",
+        "医院",
+        "医疗中心"
+      ]
+    },
+    "b2c_store": {
+      "canonical_en": "B2C-only store",
+      "aliases": [
+        "B2C-only store",
+        "consumer-only store",
+        "retail-only shop",
+        "纯零售店",
+        "仅面向消费者的商店"
+      ]
+    }
+  },
+  "product_families": [
+    {
+      "family": "Dental Teaching and Lab Products",
+      "keywords": [
+        "dental simulator",
+        "dental teaching equipment",
+        "phantom head",
+        "dental manikin",
+        "teeth model",
+        "dental workstation",
+        "dental assessment system",
+        "preclinical dental training system"
+      ],
+      "zh_aliases": [
+        "牙科模拟器",
+        "口腔教学模拟系统",
+        "牙科教学设备",
+        "仿头模",
+        "牙科人头模型",
+        "牙齿模型",
+        "牙科工作台"
+      ],
+      "best_customer_types": [
+        "dental_school",
+        "dental_training_center",
+        "dental_equipment_distributor"
+      ],
+      "exclude_customer_types": [
+        "general_dental_clinic",
+        "b2c_store"
+      ],
+      "reason_zh": "牙科模拟器、仿头模、牙齿模型和教学工作台适合牙科学院、培训中心及教学设备经销商。"
+    },
+    {
+      "family": "Dental Equipment",
+      "keywords": [
+        "chair mounted dental unit",
+        "portable dental unit",
+        "oil-free air compressor",
+        "dental suction motor",
+        "dental X-ray unit",
+        "dental imaging system",
+        "dental autoclave",
+        "dental handpiece",
+        "curing light",
+        "ultrasonic scaler",
+        "intraoral camera"
+      ],
+      "zh_aliases": [
+        "牙科综合治疗机",
+        "便携式牙科设备",
+        "无油空压机",
+        "牙科抽吸机",
+        "牙科X光机",
+        "牙科影像系统",
+        "牙科灭菌器",
+        "牙科手机",
+        "光固化灯",
+        "超声洁牙机",
+        "口内相机"
+      ],
+      "best_customer_types": [
+        "dental_equipment_distributor",
+        "dental_school",
+        "dental_training_center"
+      ],
+      "exclude_customer_types": [
+        "b2c_store"
+      ],
+      "reason_zh": "牙科设备目录覆盖牙椅、便携设备、影像、灭菌、小设备和手机，适合设备经销商及教学采购。"
+    },
+    {
+      "family": "Dental Consumables",
+      "keywords": [
+        "dental disposables",
+        "dental bibs",
+        "dental implant kit",
+        "dental sterilization packaging",
+        "dental burs",
+        "diamond instruments"
+      ],
+      "zh_aliases": [
+        "牙科耗材",
+        "牙科一次性用品",
+        "牙科围兜",
+        "种植手术包",
+        "牙科灭菌包装",
+        "牙钻",
+        "金刚砂车针"
+      ],
+      "best_customer_types": [
+        "dental_equipment_distributor",
+        "medical_consumables_distributor",
+        "hospital_supplies_distributor"
+      ],
+      "exclude_customer_types": [
+        "b2c_store"
+      ],
+      "reason_zh": "牙科一次性用品、灭菌包装及车针适合牙科耗材经销商、进口商和批发渠道。"
+    },
+    {
+      "family": "Medical Protective Apparel",
+      "keywords": [
+        "surgical gown",
+        "reinforced surgical gown",
+        "isolation gown",
+        "surgical drape",
+        "face mask",
+        "shoe cover",
+        "exam nitrile gloves",
+        "sterile surgical latex gloves"
+      ],
+      "zh_aliases": [
+        "手术衣",
+        "加强型手术衣",
+        "隔离衣",
+        "手术洞巾",
+        "医用口罩",
+        "鞋套",
+        "丁腈检查手套",
+        "无菌外科乳胶手套"
+      ],
+      "best_customer_types": [
+        "medical_consumables_distributor",
+        "hospital_supplies_distributor",
+        "medical_wholesaler",
+        "hospital"
+      ],
+      "exclude_customer_types": [
+        "b2c_store"
+      ],
+      "reason_zh": "防护服饰目录覆盖手术衣、隔离衣、手术铺单、口罩、鞋套和医用手套，适合医院耗材渠道。"
+    },
+    {
+      "family": "Sterilization Products",
+      "keywords": [
+        "self-sealing sterilization pouch",
+        "heat-sealing sterilization pouch",
+        "sterilization roll",
+        "gusseted sterilization pouch",
+        "sterilization indicator tape",
+        "sterilization paper bag",
+        "medical sterilization wrap"
+      ],
+      "zh_aliases": [
+        "自封灭菌袋",
+        "热封灭菌袋",
+        "灭菌卷袋",
+        "立体灭菌袋",
+        "灭菌指示胶带",
+        "灭菌纸袋",
+        "医用灭菌包布"
+      ],
+      "best_customer_types": [
+        "medical_consumables_distributor",
+        "hospital_supplies_distributor",
+        "medical_wholesaler",
+        "hospital",
+        "dental_equipment_distributor"
+      ],
+      "exclude_customer_types": [
+        "b2c_store"
+      ],
+      "reason_zh": "灭菌袋、卷袋、指示胶带和包布面向医院 CSSD、牙科灭菌及专业医疗耗材渠道。"
+    },
+    {
+      "family": "Wound Care and Medical Consumables",
+      "keywords": [
+        "medical adhesive tape",
+        "orthopedic bandage",
+        "elastic bandage",
+        "cotton crepe bandage",
+        "non-woven swabs",
+        "gauze swabs",
+        "lap sponge",
+        "gauze roll",
+        "cotton ball",
+        "cotton bud",
+        "disposable syringe"
+      ],
+      "zh_aliases": [
+        "医用胶带",
+        "骨科绷带",
+        "弹性绷带",
+        "棉皱纹绷带",
+        "无纺布敷料",
+        "纱布块",
+        "腹部垫",
+        "纱布卷",
+        "棉球",
+        "棉签",
+        "一次性注射器"
+      ],
+      "best_customer_types": [
+        "medical_consumables_distributor",
+        "hospital_supplies_distributor",
+        "medical_wholesaler",
+        "hospital"
+      ],
+      "exclude_customer_types": [
+        "b2c_store"
+      ],
+      "reason_zh": "绷带、医用胶带、纱布、敷料、棉制品和注射器适合医疗耗材经销与医院用品批发渠道。"
+    }
+  ]
+}

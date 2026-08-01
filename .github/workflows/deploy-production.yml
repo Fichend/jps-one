@@ -54,11 +54,14 @@ jobs:
             --exclude='**/.env*' \
             --exclude='*.db' \
             --exclude='*.sqlite*' \
-            --exclude='data/' \
-            --exclude='uploads/' \
-            --exclude='runtime/' \
-            --exclude='backups/' \
-            --exclude='outputs/' \
+            --exclude='/data/' \
+            --exclude='/backend/data/' \
+            --exclude='/uploads/' \
+            --exclude='/backend/uploads/' \
+            --exclude='/runtime/' \
+            --exclude='/backend/runtime/' \
+            --exclude='/backups/' \
+            --exclude='/outputs/' \
             --exclude='frontend/node_modules/' \
             --exclude='frontend/dist/' \
             -e 'ssh -i ~/.ssh/jps-one-deploy' \
@@ -74,4 +77,3 @@ jobs:
           set -euo pipefail
           ssh -i ~/.ssh/jps-one-deploy "$EC2_USER@$EC2_HOST" \
             "bash /opt/jps-one/releases/$DEPLOY_SHA/deploy/activate-release.sh '$DEPLOY_SHA'"
-

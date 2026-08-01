@@ -38,6 +38,8 @@ jobs:
           tests/test_locale_keyword_expander.py
           tests/test_scoring.py
           tests/test_tool_executor.py
+          tests/test_hunt_copilot
+          tests/test_product_knowledge
           tests/test_backcheck/test_field_mapper.py
           tests/test_email/test_body_format.py
           tests/test_email/test_policy.py
