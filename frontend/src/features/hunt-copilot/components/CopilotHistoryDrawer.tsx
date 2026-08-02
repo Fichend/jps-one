@@ -25,7 +25,7 @@ export function CopilotHistoryDrawer({
   return (
     <>
       <div className={`fixed inset-0 z-40 bg-black/30 transition-opacity ${open ? "opacity-100" : "pointer-events-none opacity-0"}`} onClick={onClose} />
-      <aside className={`fixed inset-y-0 left-0 z-50 w-full max-w-sm border-r bg-background shadow-xl transition-transform duration-200 ${open ? "translate-x-0" : "-translate-x-full"}`}>
+      <aside className={`fixed inset-y-0 left-0 z-50 w-full max-w-sm border-r bg-background shadow-[0_0_32px_rgba(20,94,84,0.12)] transition-transform duration-200 ${open ? "translate-x-0" : "-translate-x-full"}`}>
         <div className="flex h-full flex-col">
           <div className="flex items-center justify-between border-b px-4 py-3">
             <div>
@@ -36,7 +36,7 @@ export function CopilotHistoryDrawer({
               <X className="h-4 w-4" />
             </Button>
           </div>
-          <div className="flex-1 overflow-y-auto p-4">
+          <div className="jps-scroll-region flex-1 overflow-y-auto p-4">
             <CopilotHistoryPanel
               sessions={sessions}
               loading={loading}

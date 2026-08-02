@@ -81,12 +81,12 @@ export function StrategyCardPanel({
       </CardHeader>
       <CardContent className="space-y-4 p-5 text-sm">
         {!strategy ? (
-          <div className="rounded-md border bg-muted/30 p-4 text-muted-foreground">先在对话区描述目标客户。策略卡会在这里实时更新，确认前不会调用搜索 API。</div>
+          <div className="rounded-md border bg-muted/30 p-4 text-muted-foreground">先在对话区描述目标客户。搜索方案会在这里实时更新，确认前不会开始正式搜索。</div>
         ) : (
           <>
             {session?.selected_skill ? (
               <div className="rounded-md border bg-muted/30 p-3 text-xs leading-5">
-                <p className="font-medium text-foreground">当前 Skill：{session.selected_skill.skill.name}</p>
+                <p className="font-medium text-foreground">当前搜索方案：{session.selected_skill.skill.name}</p>
                 <p className="text-muted-foreground">{session.selected_skill.reason}</p>
               </div>
             ) : null}
@@ -139,7 +139,7 @@ export function StrategyCardPanel({
               <div className="grid gap-2 text-xs text-muted-foreground">
                 <RuleLine label="业务排除" value={strategy.rules.hard_filter_enabled ? "启用" : "未启用"} />
                 <RuleLine label="缺失字段" value="保留候选，补全字段加分排序" />
-                <RuleLine label="候选池" value={strategy.rules.candidate_pool_enabled ? "先进入 candidate_pool" : "未启用"} />
+                <RuleLine label="候选池" value={strategy.rules.candidate_pool_enabled ? "先汇总候选客户" : "未启用"} />
                 <RuleLine label="实体合并" value={strategy.rules.merge_multi_source_evidence ? "多源证据合并后排序" : "未启用"} />
               </div>
             </StrategyStep>
@@ -181,7 +181,7 @@ export function StrategyCardPanel({
             ) : null}
 
             <div className="rounded-md bg-muted/40 p-3 text-xs leading-5 text-muted-foreground">
-              默认启用 Tavily Web、Google Maps、Apify Instagram、Apify Facebook 和网页补全。结果先进入候选池，再做多源合并和排序。
+              系统会组合公开网页、商业地图与公开社交渠道寻找客户，结果先进入候选池，再进行资料合并和排序。
             </div>
 
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 xl:grid-cols-1 2xl:grid-cols-3">

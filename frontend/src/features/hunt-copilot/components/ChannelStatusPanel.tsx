@@ -15,6 +15,15 @@ const modeLabels: Record<string, string> = {
   disabled: "暂不执行",
 };
 
+function businessChannelLabel(value: string) {
+  const key = value.toLowerCase();
+  if (key.includes("map") || key.includes("serper")) return "商业地图";
+  if (key.includes("instagram")) return "Instagram 公开页面";
+  if (key.includes("facebook")) return "Facebook 公开页面";
+  if (key.includes("web") || key.includes("tavily") || key.includes("jina")) return "公开网络搜索";
+  return "公开客户渠道";
+}
+
 export function ChannelStatusPanel({ session, requiredLabels }: { session: HuntCopilotSession | null; requiredLabels: string[] }) {
   return (
     <Card>
@@ -29,7 +38,7 @@ export function ChannelStatusPanel({ session, requiredLabels }: { session: HuntC
           session.channel_status.map((item) => (
             <div key={item.channel} className="flex items-start justify-between gap-3 rounded-md border px-3 py-2">
               <div>
-                <p className="font-medium">{item.channel}</p>
+                <p className="font-medium">{businessChannelLabel(item.channel)}</p>
                 <p className="text-xs text-muted-foreground">{item.message}</p>
               </div>
               <Badge variant={item.configured ? "success" : "warning"}>{item.status}</Badge>
@@ -51,11 +60,11 @@ export function ChannelStatusPanel({ session, requiredLabels }: { session: HuntC
         )}
         {session?.tool_execution_preview?.length ? (
           <div className="space-y-2 rounded-md border bg-muted/30 p-3">
-            <p className="font-medium">MCP 工具层</p>
+            <p className="font-medium">搜索渠道计划</p>
             {session.tool_execution_preview.map((item) => (
               <div key={item.tool} className="flex items-start justify-between gap-3 text-xs">
                 <div>
-                  <p className="font-medium text-foreground">{item.tool}</p>
+                  <p className="font-medium text-foreground">{businessChannelLabel(item.tool)}</p>
                   <p className="text-muted-foreground">
                     {phaseLabels[item.phase || "discovery"] || item.phase || "主搜索"} · {modeLabels[item.execution_mode || "search_phase"] || item.execution_mode || "立即执行"}
                   </p>

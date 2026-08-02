@@ -33,7 +33,7 @@ export function CopilotChatPanel({
                 <MessageSquare className="h-5 w-5 text-primary" />
                 <CardTitle className="text-lg">对话工作区</CardTitle>
               </div>
-              <p className="mt-1 text-sm text-muted-foreground">先共同整理策略卡，确认前不会调用搜索 API。</p>
+              <p className="mt-1 text-sm text-muted-foreground">先共同整理搜索方案，确认前不会开始正式搜索。</p>
             </div>
             {busy ? (
               <div className="flex shrink-0 items-center gap-1.5 rounded-full border bg-muted/40 px-2.5 py-1 text-xs text-muted-foreground">

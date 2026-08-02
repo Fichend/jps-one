@@ -43,9 +43,9 @@ export function Sheet({ open, onClose, children, className }: SheetProps) {
       {/* Panel */}
       <div
         className={cn(
-          "fixed inset-y-0 right-0 z-50 w-full max-w-lg bg-background shadow-xl border-l",
+          "fixed inset-y-0 right-0 z-50 w-full max-w-lg border-l bg-background shadow-[0_0_32px_rgba(20,94,84,0.12)]",
           "transform transition-transform duration-200 ease-out",
-          "overflow-y-auto",
+          "jps-scroll-region overflow-y-auto",
           open ? "translate-x-0" : "translate-x-full",
           className,
         )}

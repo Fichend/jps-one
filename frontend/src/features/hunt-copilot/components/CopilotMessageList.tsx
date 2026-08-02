@@ -14,7 +14,7 @@ export function CopilotMessageList({ messages }: { messages: HuntCopilotMessage[
   }, [messages.length]);
 
   return (
-    <div ref={containerRef} className="min-h-0 flex-1 overflow-y-auto bg-muted/20 px-4 py-5">
+    <div ref={containerRef} className="jps-scroll-region min-h-0 flex-1 overflow-y-auto bg-muted/20 px-4 py-5">
       {!messages.length && <OpeningGuide />}
       {messages.map((message, index) => (
         <div key={`${message.created_at}-${index}`} className={`mb-4 flex gap-2.5 ${message.role === "user" ? "justify-end" : "justify-start"}`}>
