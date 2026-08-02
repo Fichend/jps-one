@@ -176,20 +176,24 @@ export function DashboardPage() {
   }, [automationMetrics?.recent_failed_hunts?.length, automationMetrics?.recent_reply_events?.length, automationMetrics?.recent_sent_messages?.length, showFailed, showReply, showSent]);
 
   return (
-    <div className="space-y-8">
-      <div className="flex items-center justify-between">
+    <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">JPS One 工作台</h1>
-          <p className="text-muted-foreground mt-1">搜索潜客、沉淀客户池、匹配 JPS 产品、生成邮件和报价的统一运营入口</p>
+          <h1 className="text-3xl font-semibold tracking-tight">任务看板</h1>
+          <p className="mt-1 text-sm text-muted-foreground">查看全部一键搜索和深度搜索任务，继续处理客户结果。</p>
         </div>
-        <Link to="/hunts/new">
-          <Button>
-            <Plus className="h-4 w-4 mr-2" />
-            新建任务
-          </Button>
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          <Link to="/deep-search"><Button variant="outline"><Crosshair className="mr-2 h-4 w-4" />深度搜索</Button></Link>
+          <Link to="/hunts/new"><Button><Plus className="mr-2 h-4 w-4" />新建一键搜索</Button></Link>
+        </div>
       </div>
 
+      <details className="group order-3 rounded-xl border border-border/80 bg-white">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 text-sm font-medium marker:hidden">
+          <span>系统运行信息</span>
+          <span className="text-xs font-normal text-muted-foreground">任务队列、邮件状态与异常记录</span>
+        </summary>
+        <div className="space-y-4 border-t border-border/80 p-4 lg:p-5">
       {dashboardErrors.length > 0 && (
         <Card className="border-amber-300">
           <CardHeader>
@@ -482,6 +486,8 @@ export function DashboardPage() {
           ) : <div />}
         </div>
       ) : null}
+        </div>
+      </details>
 
       {huntList.length ? (
         <div className="space-y-3">
@@ -525,7 +531,7 @@ export function DashboardPage() {
                     const deleteDisabled = hunt.status === "running" || hunt.status === "pending" || hunt.status === "queued";
                     const importDisabled = hunt.customer_pool_status === "imported" || hunt.leads_count <= 0;
                     return (
-                      <Card key={hunt.hunt_id} className="rounded-md transition-shadow hover:shadow-md">
+                      <Card key={hunt.hunt_id} className="group/card overflow-hidden rounded-xl transition-[border-color,box-shadow,transform] hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-[0_12px_30px_rgba(20,94,84,0.09)]">
 	                          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
 	                            <CardTitle className="max-w-[70%] truncate text-sm font-medium">
 	                              <Link to="/hunts/$huntId" params={{ huntId: hunt.hunt_id }} className="hover:underline">
@@ -533,7 +539,7 @@ export function DashboardPage() {
 	                              </Link>
 	                            </CardTitle>
 	                          <div className="flex shrink-0 items-center gap-1.5">
-	                            {hunt.task_type === "single_deep_search" ? <Badge variant="outline">单独任务</Badge> : null}
+	                            {hunt.task_type === "single_deep_search" ? <Badge variant="outline">深度搜索</Badge> : <Badge variant="outline">一键搜索</Badge>}
 	                            <Badge variant={taskStatusVariant(hunt.status)}>{getStatusLabel(hunt.status)}</Badge>
 	                          </div>
 	                        </CardHeader>
@@ -690,11 +696,11 @@ export function DashboardPage() {
           <CardContent className="flex flex-col items-center justify-center py-16">
             <Crosshair className="h-12 w-12 text-muted-foreground mb-4" />
           <h3 className="text-lg font-semibold mb-2">还没有任务记录</h3>
-          <p className="text-muted-foreground mb-6">创建一个新的 JPS One 获客任务</p>
+          <p className="mb-6 text-muted-foreground">创建一项一键搜索任务，开始批量寻找目标客户。</p>
             <Link to="/hunts/new">
               <Button>
                 <Plus className="h-4 w-4 mr-2" />
-                创建任务
+                新建一键搜索
               </Button>
             </Link>
           </CardContent>

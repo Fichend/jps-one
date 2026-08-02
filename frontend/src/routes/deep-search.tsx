@@ -44,8 +44,6 @@ function CandidateCard({ candidate, huntId }: { candidate: Candidate; huntId: st
   const phones = list(candidate.phone_numbers || candidate.phone);
   const links = social(candidate);
   const evidenceItems = evidence(candidate);
-  const summary = candidate.deep_search_summary && typeof candidate.deep_search_summary === "object" ? candidate.deep_search_summary as Record<string, unknown> : {};
-  const tools = summary.tools && typeof summary.tools === "object" ? summary.tools as Record<string, Record<string, number>> : {};
   return (
     <Card className="rounded-md">
       <CardHeader className="space-y-3 pb-3">
@@ -83,17 +81,6 @@ function CandidateCard({ candidate, huntId }: { candidate: Candidate; huntId: st
               <a key={key} href={url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-md border px-2.5 py-1 text-xs text-primary hover:bg-primary/5">
                 {key.toUpperCase()} <ExternalLink className="h-3 w-3" />
               </a>
-            ))}
-          </div>
-        ) : null}
-
-        {Object.keys(tools).length ? (
-          <div className="grid gap-2 md:grid-cols-4">
-            {Object.entries(tools).map(([tool, item]) => (
-              <div key={tool} className="rounded-md border bg-white px-3 py-2 text-xs">
-                <div className="font-medium">{tool}</div>
-                <div className="mt-1 text-muted-foreground">调用 {item.calls || 0} · 结果 {item.items || 0}</div>
-              </div>
             ))}
           </div>
         ) : null}
@@ -174,7 +161,7 @@ export function DeepSearchPage() {
     <div className="space-y-5">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">深度搜索</h1>
-        <p className="mt-1 text-sm text-muted-foreground">输入一个已知官网，系统会集中调用 Tavily search/map/extract/crawl/research、Serper 和 Apify，生成单客户资料卡。</p>
+        <p className="mt-1 text-sm text-muted-foreground">输入已知公司官网，集中补全企业背景、联系方式、社交渠道和业务证据。</p>
       </div>
 
       <Card className="rounded-md">
@@ -189,7 +176,7 @@ export function DeepSearchPage() {
             <label className="space-y-1.5 text-sm font-medium md:col-span-2">JPS 产品方向<Input value={productKeywords} onChange={(e) => setProductKeywords(e.target.value)} placeholder="dental simulator; phantom head; dental teaching equipment" /></label>
           </div>
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="text-xs text-muted-foreground">默认启用 Tavily search/map/extract/crawl/research、Serper Google/Maps、Apify Instagram/Facebook。</div>
+            <div className="text-xs text-muted-foreground">搜索结果会作为独立任务保存，并同步到任务看板。</div>
             <Button disabled={!website.trim() || createMutation.isPending || isRunning} onClick={() => createMutation.mutate()} className="gap-2">
               {createMutation.isPending || isRunning ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
               开始深度搜索
@@ -204,7 +191,7 @@ export function DeepSearchPage() {
           <div className="flex items-center gap-2 font-medium"><Activity className="h-4 w-4 text-muted-foreground" />深度搜索结果</div>
           {activeHuntId ? <Badge variant={resultQuery.data?.status === "completed" ? "success" : resultQuery.data?.status === "failed" ? "destructive" : "warning"}>{resultQuery.data?.status || "同步中"}</Badge> : <Badge variant="secondary">等待提交</Badge>}
         </div>
-        <div className="max-h-[calc(100vh-23rem)] min-h-[22rem] overflow-y-auto bg-[#f8fafc] p-4">
+        <div className="jps-scroll-region max-h-[calc(100vh-23rem)] min-h-[22rem] overflow-y-auto bg-muted/25 p-4">
           {!activeHuntId ? (
             <div className="flex h-72 items-center justify-center rounded-md border border-dashed bg-white text-sm text-muted-foreground">提交官网后，客户卡片会显示在这里。</div>
           ) : resultQuery.isLoading || isRunning ? (
