@@ -86,6 +86,8 @@ class SettingsPayload(BaseModel):
     email_smtp_username: str = ""
     email_smtp_password: str = ""
     email_smtp_last_test_at: str = ""
+    email_smtp_security: str = ""
+    email_smtp_verify_cert: str = ""
     email_imap_host: str = ""
     email_imap_port: str = ""
     email_imap_username: str = ""
@@ -269,6 +271,8 @@ async def save_settings(payload: SettingsPayload):
         "email_smtp_username": "EMAIL_SMTP_USERNAME",
         "email_smtp_password": "EMAIL_SMTP_PASSWORD",
         "email_smtp_last_test_at": "EMAIL_SMTP_LAST_TEST_AT",
+        "email_smtp_security": "EMAIL_SMTP_SECURITY",
+        "email_smtp_verify_cert": "EMAIL_SMTP_VERIFY_CERT",
         "email_imap_host": "EMAIL_IMAP_HOST",
         "email_imap_port": "EMAIL_IMAP_PORT",
         "email_imap_username": "EMAIL_IMAP_USERNAME",
@@ -324,7 +328,7 @@ async def save_settings(payload: SettingsPayload):
         if isinstance(value, str) and _is_masked(value):
             continue
         updates[env_key] = str(value)
-        if field in {"email_from_address", "email_smtp_host", "email_smtp_port", "email_smtp_username", "email_smtp_password", "email_use_tls"}:
+        if field in {"email_from_address", "email_smtp_host", "email_smtp_port", "email_smtp_username", "email_smtp_password", "email_use_tls", "email_smtp_security", "email_smtp_verify_cert"}:
             smtp_fields_changed = True
         if field in {"email_imap_host", "email_imap_port", "email_imap_username", "email_imap_password"}:
             imap_fields_changed = True

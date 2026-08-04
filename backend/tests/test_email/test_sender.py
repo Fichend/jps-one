@@ -26,9 +26,8 @@ async def test_send_email_smtp_success():
         "use_tls": 1,
     }
     smtp = MagicMock()
-    smtp.__enter__.return_value = smtp
-    smtp.__exit__.return_value = False
-    with patch("emailing.email_sender.smtplib.SMTP", return_value=smtp):
+    smtp.send_message.return_value = {}
+    with patch("emailing.providers.smtp_provider.smtplib.SMTP", return_value=smtp):
         result = await send_email(account, to_email="buyer@example.com", subject="Hi", body_text="Hello")
     assert result["ok"] is True
     assert result["provider"] == "smtp"
@@ -49,9 +48,8 @@ async def test_send_email_formats_plaintext_body_before_sending():
         "use_tls": 1,
     }
     smtp = MagicMock()
-    smtp.__enter__.return_value = smtp
-    smtp.__exit__.return_value = False
-    with patch("emailing.email_sender.smtplib.SMTP", return_value=smtp):
+    smtp.send_message.return_value = {}
+    with patch("emailing.providers.smtp_provider.smtplib.SMTP", return_value=smtp):
         await send_email(
             account,
             to_email="buyer@example.com",

@@ -613,6 +613,16 @@ function CopyButton({ text }: { text: string }) {
   );
 }
 
+function mutationErrorText(error: unknown, fallback: string): string {
+  return error instanceof Error ? error.message : fallback;
+}
+
+function removeRecordKey<T>(record: Record<string, T>, key: string): Record<string, T> {
+  const next = { ...record };
+  delete next[key];
+  return next;
+}
+
 // ── Lead Detail Sheet ─────────────────────────────────────────────────
 function LeadDetailSheet({ lead: inputLead, open, onClose, huntId }: { lead: Lead | null; open: boolean; onClose: () => void; huntId: string }) {
   const queryClient = useQueryClient();
@@ -620,13 +630,26 @@ function LeadDetailSheet({ lead: inputLead, open, onClose, huntId }: { lead: Lea
   const [manualEditing, setManualEditing] = useState(false);
   const [manualFields, setManualFields] = useState<Record<string, string>>({});
   const [backcheckFileName, setBackcheckFileName] = useState("");
-  const [deepEnrichResult, setDeepEnrichResult] = useState<Record<string, unknown> | null>(null);
+  const [calibrationPendingById, setCalibrationPendingById] = useState<Record<string, boolean>>({});
+  const [calibrationErrorById, setCalibrationErrorById] = useState<Record<string, string>>({});
+  const [deepEnrichPendingById, setDeepEnrichPendingById] = useState<Record<string, boolean>>({});
+  const [deepEnrichErrorById, setDeepEnrichErrorById] = useState<Record<string, string>>({});
+  const [deepEnrichResultById, setDeepEnrichResultById] = useState<Record<string, Record<string, unknown>>>({});
   const [showDeepEnrichDetails, setShowDeepEnrichDetails] = useState(false);
   const lead = detailLead || inputLead;
   const activeCandidateId = lead ? candidateIdentity(lead) : "";
+  const activeCandidateIdRef = useRef(activeCandidateId);
+  const calibrationPending = Boolean(activeCandidateId && calibrationPendingById[activeCandidateId]);
+  const deepEnrichPending = Boolean(activeCandidateId && deepEnrichPendingById[activeCandidateId]);
+  const calibrationError = activeCandidateId ? calibrationErrorById[activeCandidateId] || "" : "";
+  const deepEnrichError = activeCandidateId ? deepEnrichErrorById[activeCandidateId] || "" : "";
+  const deepEnrichResult = activeCandidateId ? deepEnrichResultById[activeCandidateId] || null : null;
   const refreshHunt = async () => {
     await queryClient.invalidateQueries({ queryKey: ["hunt-result", huntId] });
   };
+  useEffect(() => {
+    activeCandidateIdRef.current = activeCandidateId;
+  }, [activeCandidateId]);
   const backcheckMutation = useMutation({
     mutationFn: async () => {
       if (!lead) throw new Error("客户信息为空，无法生成背调表");
@@ -651,16 +674,28 @@ function LeadDetailSheet({ lead: inputLead, open, onClose, huntId }: { lead: Lea
     setManualEditing(false);
     setBackcheckFileName("");
     backcheckMutation.reset();
-    setDeepEnrichResult(null);
     setShowDeepEnrichDetails(false);
   }, [inputLead, open]);
   const calibrationMutation = useMutation({
-    mutationFn: () => api.calibrateCandidateProfile(huntId, activeCandidateId),
-    onSuccess: async (data) => {
-      setDetailLead(data.candidate as Lead);
-      setManualEditing(false);
+    mutationFn: (candidateId: string) => api.calibrateCandidateProfile(huntId, candidateId),
+    onMutate: (candidateId) => {
+      setCalibrationPendingById((current) => ({ ...current, [candidateId]: true }));
+      setCalibrationErrorById((current) => removeRecordKey(current, candidateId));
+    },
+    onSuccess: async (data, candidateId) => {
+      if (activeCandidateIdRef.current === candidateId) {
+        setDetailLead(data.candidate as Lead);
+        setManualEditing(false);
+      }
       await api.extractEmailProfiles(huntId).catch(() => undefined);
       await refreshHunt();
+    },
+    onError: (error, candidateId) => {
+      setCalibrationErrorById((current) => ({ ...current, [candidateId]: mutationErrorText(error, "自动校准失败") }));
+    },
+    onSettled: (_data, _error, candidateId) => {
+      if (!candidateId) return;
+      setCalibrationPendingById((current) => removeRecordKey(current, candidateId));
     },
   });
   const manualUpdateMutation = useMutation({
@@ -684,11 +719,24 @@ function LeadDetailSheet({ lead: inputLead, open, onClose, huntId }: { lead: Lea
     },
   });
   const deepEnrichMutation = useMutation({
-    mutationFn: () => api.deepEnrichCandidateProfile(huntId, activeCandidateId, { mode: "deep", max_depth: 2, max_pages: 30 }),
-    onSuccess: async (data) => {
-      setDetailLead(data.candidate as Lead);
-      setDeepEnrichResult(data as unknown as Record<string, unknown>);
+    mutationFn: (candidateId: string) => api.deepEnrichCandidateProfile(huntId, candidateId, { mode: "deep", max_depth: 2, max_pages: 30 }),
+    onMutate: (candidateId) => {
+      setDeepEnrichPendingById((current) => ({ ...current, [candidateId]: true }));
+      setDeepEnrichErrorById((current) => removeRecordKey(current, candidateId));
+    },
+    onSuccess: async (data, candidateId) => {
+      if (activeCandidateIdRef.current === candidateId) {
+        setDetailLead(data.candidate as Lead);
+      }
+      setDeepEnrichResultById((current) => ({ ...current, [candidateId]: data as unknown as Record<string, unknown> }));
       await refreshHunt();
+    },
+    onError: (error, candidateId) => {
+      setDeepEnrichErrorById((current) => ({ ...current, [candidateId]: mutationErrorText(error, "深度补全失败") }));
+    },
+    onSettled: (_data, _error, candidateId) => {
+      if (!candidateId) return;
+      setDeepEnrichPendingById((current) => removeRecordKey(current, candidateId));
     },
   });
 
@@ -1057,10 +1105,10 @@ function LeadDetailSheet({ lead: inputLead, open, onClose, huntId }: { lead: Lea
                 size="sm"
                 variant="outline"
                 className="gap-2"
-                disabled={!activeCandidateId || calibrationMutation.isPending}
-                onClick={() => calibrationMutation.mutate()}
+                disabled={!activeCandidateId || calibrationPending}
+                onClick={() => activeCandidateId && calibrationMutation.mutate(activeCandidateId)}
               >
-                {calibrationMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wand2 className="h-4 w-4" />}
+                {calibrationPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wand2 className="h-4 w-4" />}
                 自动校准信息
               </Button>
               <Button type="button" size="sm" variant="outline" className="gap-2" onClick={fillManualFields}>
@@ -1072,14 +1120,14 @@ function LeadDetailSheet({ lead: inputLead, open, onClose, huntId }: { lead: Lea
                 size="sm"
                 variant="outline"
                 className="gap-2"
-                disabled={!activeCandidateId || deepEnrichMutation.isPending}
-                onClick={() => deepEnrichMutation.mutate()}
+                disabled={!activeCandidateId || deepEnrichPending}
+                onClick={() => activeCandidateId && deepEnrichMutation.mutate(activeCandidateId)}
               >
-                {deepEnrichMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+                {deepEnrichPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
                 深度补全
               </Button>
             </div>
-            {(deepEnrichMutation.isSuccess || Boolean(lead.deep_enriched_at)) && (
+            {(Boolean(deepEnrichResult) || Boolean(lead.deep_enriched_at)) && (
               <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <span>
@@ -1092,14 +1140,14 @@ function LeadDetailSheet({ lead: inputLead, open, onClose, huntId }: { lead: Lea
                 {deepSummary.recommended_email ? <p className="mt-1">推荐邮箱：{String(deepSummary.recommended_email)}</p> : null}
               </div>
             )}
-            {deepEnrichMutation.isError && (
+            {deepEnrichError && (
               <div className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
-                {deepEnrichMutation.error instanceof Error ? deepEnrichMutation.error.message : "深度补全失败"}
+                {deepEnrichError}
               </div>
             )}
-            {calibrationMutation.isError && (
+            {calibrationError && (
               <div className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
-                {calibrationMutation.error instanceof Error ? calibrationMutation.error.message : "自动校准失败"}
+                {calibrationError}
               </div>
             )}
             {manualUpdateMutation.isError && (
