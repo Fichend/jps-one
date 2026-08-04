@@ -50,10 +50,10 @@ async def apply_candidate_intelligence(
         return candidates
 
     budget = search_budget or {}
-    max_candidates = _as_int(getattr(settings, "candidate_intelligence_max_candidates", 30), 30)
-    final_leads = _as_int(budget.get("final_leads"), 10)
-    limit = max(final_leads, max_candidates)
-    selected = [candidate for candidate in candidates[:limit] if _needs_intelligence(candidate)]
+    # Review every non-excluded candidate in the pool. Earlier versions capped
+    # this to candidate_intelligence_max_candidates, which meant a good customer
+    # ranked below the cap could miss the LLM-readable profile and fit review.
+    selected = [candidate for candidate in candidates if _needs_intelligence(candidate)]
     if not selected:
         return candidates
 

@@ -81,3 +81,42 @@ async def test_orchestrator_merges_enriched_rows(monkeypatch):
     assert enriched[0]["instagram_url"] == "https://www.instagram.com/bangkok_dental_school/"
     assert enriched[0]["enrichment_status"] == "enriched"
     assert enriched[0]["enrichment_attempts"] >= 1
+
+
+@pytest.mark.asyncio
+async def test_orchestrator_scales_task_cap_to_user_candidate_pool(monkeypatch):
+    calls = []
+
+    async def fake_run(self, task):
+        calls.append(task)
+        return EnrichmentResult(task.candidate_id, task.task_type, task.query_or_url, "test", "partial", "no-op", [])
+
+    async def fake_close(self):
+        return None
+
+    monkeypatch.setattr("enrichment.social_enricher.SocialEnricher.run", fake_run)
+    monkeypatch.setattr("enrichment.website_enricher.WebsiteEnricher.run", fake_run)
+    monkeypatch.setattr("enrichment.website_enricher.WebsiteEnricher.close", fake_close)
+
+    candidates = [
+        {
+            "candidate_id": f"domain:school-{index}.example",
+            "company_name": f"Bangkok Dental School {index}",
+            "website": f"https://school-{index}.example",
+            "missing_fields": ["email", "phone", "instagram", "facebook"],
+            "source_channels": ["web.search.tavily"],
+            "evidence_items": [],
+            "confidence": 0.5,
+        }
+        for index in range(4)
+    ]
+
+    enriched = await enrich_candidate_pool(
+        candidates,
+        settings=DummySettings(),
+        budget={"max_candidates": 4},
+        hard_filters={"require_email": True, "require_phone": True, "require_instagram": True, "require_facebook": True},
+    )
+
+    assert len(calls) == 16
+    assert all(item.get("enrichment_status") == "partial" for item in enriched)

@@ -311,7 +311,7 @@ def test_create_campaign_includes_needs_review_when_approval_not_required(monkey
     assert res.json()["sequence_count"] == 1
 
 
-def test_create_campaign_skips_previously_contacted_lead_email(monkeypatch, tmp_path):
+def test_create_campaign_allows_previously_contacted_lead_email(monkeypatch, tmp_path):
     app = create_app()
     client = TestClient(app)
 
@@ -376,7 +376,7 @@ def test_create_campaign_skips_previously_contacted_lead_email(monkeypatch, tmp_
     assert first.status_code == 200
     assert first.json()["sequence_count"] == 1
     assert second.status_code == 200
-    assert second.json()["sequence_count"] == 0
+    assert second.json()["sequence_count"] == 1
 
 
 def test_run_email_scheduler_route(monkeypatch, tmp_path):

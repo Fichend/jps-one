@@ -41,7 +41,12 @@ async def enrich_candidate_pool(
 
     budget = budget or {}
     max_candidates = _as_int(budget.get("max_candidates"), len(candidates))
-    max_tasks = _as_int(getattr(settings, "candidate_enrichment_max_tasks", 80), 80)
+    configured_max_tasks = _as_int(getattr(settings, "candidate_enrichment_max_tasks", 80), 80)
+    # A candidate can need up to five bounded tasks: find website, extract,
+    # crawl, Instagram, and Facebook. Scale the cap with the user's candidate
+    # pool so large pools are still fully considered, while preserving the
+    # existing setting as the lower bound for small hunts.
+    max_tasks = max(configured_max_tasks, max_candidates * 5)
     tasks, skipped = plan_enrichment_tasks(
         candidates,
         hard_filters=hard_filters or {},

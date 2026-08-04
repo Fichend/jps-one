@@ -98,3 +98,35 @@ async def test_candidate_intelligence_respects_disabled_flag(monkeypatch):
 
     assert not FakeLLMTool.calls
     assert reviewed == candidates
+
+
+@pytest.mark.asyncio
+async def test_candidate_intelligence_reviews_all_non_excluded_candidates(monkeypatch):
+    FakeLLMTool.calls = []
+    monkeypatch.setattr("candidate_pool.intelligence.LLMTool", FakeLLMTool)
+    settings = Settings(
+        minimax_api_key="test-key",
+        candidate_intelligence_enabled=True,
+        candidate_intelligence_max_candidates=1,
+        candidate_intelligence_concurrency=2,
+    )
+
+    candidates = [
+        {
+            "candidate_id": f"school-{index}",
+            "company_name": f"Faculty of Dentistry Example {index}",
+            "candidate_status": "backup_candidate",
+            "target_type": "dental_school",
+            "evidence_items": [{"title": "Faculty of Dentistry", "snippet": "Dental simulation lab"}],
+        }
+        for index in range(3)
+    ]
+
+    reviewed = await apply_candidate_intelligence(
+        candidates,
+        settings=settings,
+        search_budget={"final_leads": 1, "customer_types": ["dental school"], "product_keywords": ["dental simulator"]},
+    )
+
+    assert len(FakeLLMTool.calls) == 3
+    assert all(item.get("candidate_intelligence") for item in reviewed)
