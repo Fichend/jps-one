@@ -146,3 +146,18 @@ def test_candidate_pool_downranks_unrelated_social_only_rows():
 
     assert candidates[0]["company_name"] == "Vietnam Dental Equipment Distributor"
     assert candidates[-1]["candidate_status"] == "low_relevance_social"
+
+
+def test_candidate_pool_caps_results_and_excludes_non_company_pages():
+    rows = [
+        {"title": "Brazil Sterilization Supplier", "link": "https://supplier.example", "source": "web_search", "snippet": "medical sterilization indicator distributor in Brazil"},
+        {"title": "Sterilization Market Size Report", "link": "https://grandviewresearch.com/industry-analysis/sterilization-market", "source": "web_search", "snippet": "market size report"},
+        {"title": "Second Medical Supplier", "link": "https://second.example", "source": "web_search", "snippet": "medical products supplier Brazil"},
+    ]
+
+    all_candidates = build_candidate_pool(rows, target_final_leads=1)
+    report = next(item for item in all_candidates if "Market Size" in item["company_name"])
+    assert report["candidate_status"] == "excluded_by_goal"
+
+    capped = build_candidate_pool(rows, target_final_leads=1, max_candidates=2)
+    assert len(capped) == 2

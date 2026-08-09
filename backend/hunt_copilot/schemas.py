@@ -307,6 +307,8 @@ class ConfirmExecutionRequest(BaseModel):
     enable_email_craft: bool = False
     email_template_examples: list[str] = Field(default_factory=list)
     email_template_notes: str = ""
+    expected_strategy_version: int | None = None
+    expected_strategy_hash: str = ""
 
 
 class CopilotResponse(BaseModel):

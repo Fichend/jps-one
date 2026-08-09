@@ -8,6 +8,7 @@ fit, product relevance, source evidence and JPS score must dominate ranking.
 from __future__ import annotations
 
 from typing import Any
+from urllib.parse import urlparse
 
 from goal_guard.rank_integration import apply_goal_guard
 
@@ -80,6 +81,10 @@ def annotate_candidate(candidate: dict[str, Any], *, preferred: list[str] | None
         penalties += 45
     goal_score = int(item.get("target_type_fit_score", 30) or 0)
     goal_flags = [str(flag) for flag in (item.get("goal_drift_flags") or [])]
+    if _looks_like_non_company_entity(item):
+        goal_flags.append("non_company_entity")
+        item["goal_drift_flags"] = list(dict.fromkeys(goal_flags))
+        penalties += 120
     if "matches_exclusion" in goal_flags:
         penalties += 90
     if any(flag in goal_flags for flag in ("directory_not_customer", "media_not_customer")):
@@ -110,7 +115,7 @@ def annotate_candidate(candidate: dict[str, Any], *, preferred: list[str] | None
     item["required_match_count"] = item["preferred_match_count"]
     item["required_total_count"] = item["preferred_total_count"]
     item["ranking_reason"] = _ranking_reason(item, preferred=preferred, penalties=penalties)
-    if "matches_exclusion" in goal_flags or any(flag in goal_flags for flag in ("directory_not_customer", "media_not_customer", "manufacturer_when_distributor_requested", "clinic_excluded", "region_mismatch_confirmed")):
+    if "matches_exclusion" in goal_flags or any(flag in goal_flags for flag in ("directory_not_customer", "media_not_customer", "non_company_entity", "manufacturer_when_distributor_requested", "clinic_excluded", "region_mismatch_confirmed")):
         item["candidate_status"] = "excluded_by_goal"
     elif penalties >= 40:
         item["candidate_status"] = "low_relevance_social" if _looks_like_low_relevance_social(item) else "excluded_by_rule"
@@ -170,6 +175,28 @@ def _looks_like_low_relevance_social(item: dict[str, Any]) -> bool:
     text = " ".join(str(value or "") for value in (item.get("company_name"), item.get("description"), item.get("industry"))).lower()
     dental_or_medical = any(marker in text for marker in ("dental", "dentist", "dentistry", "medical", "nha khoa", "ทันต", "odont", "gigi"))
     return social_only and not has_business_anchor and not dental_or_medical
+
+
+def _looks_like_non_company_entity(item: dict[str, Any]) -> bool:
+    url = str(item.get("website") or "").strip()
+    if not url:
+        evidence = item.get("evidence_items") or item.get("evidence") or []
+        url = next((str(row.get("url") or "") for row in evidence if isinstance(row, dict) and row.get("url")), "")
+    parsed = urlparse(url if "://" in url else f"https://{url}")
+    host = parsed.netloc.casefold().removeprefix("www.")
+    path = parsed.path.casefold()
+    blocked_hosts = (
+        "amazon.", "ebay.", "aliexpress.", "youtube.com", "youtu.be", "wikipedia.org",
+        "marketresearch.com", "researchandmarkets.com", "grandviewresearch.com", "statista.com",
+    )
+    if any(marker in host for marker in blocked_hosts):
+        return True
+    text = " ".join(str(item.get(key) or "") for key in ("company_name", "description", "industry")).casefold()
+    report_markers = ("market size report", "industry report", "market research report", "市场研究报告", "市场规模报告")
+    product_page = any(marker in path for marker in ("/product/", "/products/", "/dp/", "/item/")) and not any(
+        marker in text for marker in ("company", "supplier", "distributor", "manufacturer", "importer", "公司", "供应商", "经销商")
+    )
+    return product_page or any(marker in text for marker in report_markers)
 
 
 def _business_rule_penalties(item: dict[str, Any], exclusions: list[str]) -> int:

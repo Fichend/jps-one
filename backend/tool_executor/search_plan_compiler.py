@@ -173,6 +173,7 @@ def _target_type_templates(regions: list[str], customers: list[str], products: l
     region = regions[0] if regions else ""
     product = products[0] if products else ""
     text = " ".join([*customers, *products]).lower()
+    dental_context = any(marker in text for marker in ("dental", "dentist", "odont", "牙科", "口腔", "phantom"))
     queries: list[str] = []
     if any(marker in text for marker in ("school", "university", "faculty", "college", "training", "学校", "大学", "学院", "培训")):
         queries.extend(
@@ -190,15 +191,12 @@ def _target_type_templates(regions: list[str], customers: list[str], products: l
                 _join_query(("ศูนย์ฝึกอบรมทันตกรรม", product or "phantom head")),
             ])
     if any(marker in text for marker in ("distributor", "dealer", "supplier", "importer", "wholesale", "agent", "经销", "代理", "进口", "批发")):
-        queries.extend(
-            _join_query(parts)
-            for parts in (
-                (region, "dental equipment distributor", product),
-                (region, "dental supplies importer", product),
-                (region, "authorized dental dealer", product),
-                (region, "dental equipment wholesaler"),
-            )
+        templates = (
+            ((region, "dental equipment distributor", product), (region, "dental supplies importer", product), (region, "authorized dental dealer", product), (region, "dental equipment wholesaler"))
+            if dental_context
+            else ((region, product, "distributor"), (region, product, "supplier"), (region, product, "importer"), (region, product, "wholesaler"))
         )
+        queries.extend(_join_query(parts) for parts in templates)
         if _is_thailand(region):
             queries.append(_join_query(("ตัวแทนจำหน่าย อุปกรณ์ทันตกรรม", product)))
     deduped: list[str] = []

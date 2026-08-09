@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+import logging
 from datetime import datetime, timezone
 from typing import Any
 
@@ -31,9 +32,13 @@ from hunt_copilot.state_machine import allowed_actions, choose_state
 from hunt_copilot.store import HuntCopilotStore
 from hunt_copilot.strategy_fingerprint import strategy_fingerprint, strategy_similarity
 from hunt_copilot.strategy_critic import StrategyCritic
+from hunt_copilot.strategy_commands import apply_strategy_command, command_applied, parse_strategy_command
 from hunt_copilot.validator import StrategyValidator
 from search_tools import list_tool_status
 from tool_executor import ToolExecutor, build_tool_plan
+
+
+logger = logging.getLogger(__name__)
 
 
 def now_iso() -> str:
@@ -66,7 +71,16 @@ class HuntCopilotService:
             session.messages.append(ChatMessage(role="user", content=message.strip(), created_at=now_iso()))
             route = self.conversation_router.route(message, session)
             session.last_user_intent = route.intent
-            if route.should_call_planner and route.should_update_strategy:
+            command = parse_strategy_command(message)
+            if command and command.operation != "show":
+                before = session.strategy.model_copy(deep=True)
+                session.strategy = apply_strategy_command(session.strategy, command, raw_message=message)
+                session.recent_strategy_changes = _strategy_changes(before, session.strategy)
+                session.selected_skill = self.skill_selector.select(text=message, strategy=session.strategy)
+                assistant = self._command_response(session, command)
+            elif command and command.operation == "show":
+                assistant = _current_strategy_summary(session.strategy)
+            elif route.should_call_planner and route.should_update_strategy:
                 before = session.strategy.model_copy(deep=True)
                 planner_response = self.llm_planner.plan(message, session.strategy, session.state.value, **self._planner_context(session))
                 session.detected_conflicts = planner_response.detected_conflicts
@@ -82,6 +96,10 @@ class HuntCopilotService:
         self._update_memory(session, assistant)
         self._append_assistant(session, assistant)
         self.store.save(session)
+        if message.strip():
+            command = parse_strategy_command(message)
+            if command is not None and not command_applied(self._require_session(session.session_id).strategy, command):
+                raise RuntimeError("策略修改保存校验失败，请勿执行搜索。")
         return session, assistant
 
     def send(self, session_id: str, message: str) -> tuple[CopilotSession, str]:
@@ -89,7 +107,39 @@ class HuntCopilotService:
         session.messages.append(ChatMessage(role="user", content=message.strip(), created_at=now_iso()))
         route = self.conversation_router.route(message, session)
         session.last_user_intent = route.intent
-        if route.intent in {"smalltalk", "general_question", "capability_help", "strategy_discussion", "off_topic"}:
+        command = parse_strategy_command(message)
+        if command is not None:
+            if command.operation == "show":
+                assistant = _current_strategy_summary(session.strategy)
+            else:
+                before = session.strategy.model_copy(deep=True)
+                session.strategy = apply_strategy_command(session.strategy, command, raw_message=message)
+                session.detected_conflicts = []
+                session.recent_strategy_changes = _strategy_changes(before, session.strategy)
+                session.selected_skill = self.skill_selector.select(text=message, strategy=session.strategy)
+                session.preview = None
+                if session.state == CopilotState.CHANNEL_CHECK_FAILED:
+                    session.state = CopilotState.COLLECTING_REQUIREMENTS
+                self._refresh_controls(session)
+                assistant = self._command_response(session, command)
+            self._refresh_controls(session)
+            self._append_assistant(session, assistant)
+            self._update_memory(session, assistant)
+            self._touch(session)
+            self.store.save(session)
+            persisted = self._require_session(session_id)
+            if not command_applied(persisted.strategy, command):
+                raise RuntimeError("策略修改保存校验失败，请勿执行搜索。")
+            logger.info(
+                "hunt_strategy_command session=%s operation=%s field=%s values=%s version=%s verified=true",
+                session_id,
+                command.operation,
+                command.field,
+                list(command.values),
+                persisted.strategy.strategy_version,
+            )
+            return persisted, assistant
+        if route.intent in {"smalltalk", "general_question", "capability_help", "strategy_discussion", "strategy_query", "off_topic"}:
             self._refresh_controls(session)
             assistant = self.conversation_host.reply(route, session, message)
             self._append_assistant(session, assistant)
@@ -143,6 +193,7 @@ class HuntCopilotService:
     def update_strategy(self, session_id: str, strategy: HuntStrategy) -> tuple[CopilotSession, str]:
         session = self._require_session(session_id)
         session.strategy = strategy.model_validate(strategy.model_dump())
+        session.detected_conflicts = []
         session.strategy.strategy_version += 1
         session.strategy.strategy_confirmed = False
         session.strategy.needs_recheck = True
@@ -166,10 +217,10 @@ class HuntCopilotService:
         return session, assistant
 
     def get(self, session_id: str) -> CopilotSession:
-        return self._require_session(session_id)
+        return self._sync_job_state(self._require_session(session_id))
 
     def list_history(self, *, limit: int = 50) -> list[CopilotHistorySummary]:
-        return [self._history_summary(session) for session in self.store.list_recent(limit=limit)]
+        return [self._history_summary(self._sync_job_state(session)) for session in self.store.list_recent(limit=limit)]
 
     def duplicate_session(self, session_id: str) -> tuple[CopilotSession, str]:
         source = self._require_session(session_id)
@@ -216,6 +267,11 @@ class HuntCopilotService:
 
     def confirm_execution(self, session_id: str, request: ConfirmExecutionRequest) -> tuple[CopilotSession, dict[str, Any]]:
         session = self._require_session(session_id)
+        current_hash = strategy_fingerprint(session.strategy)
+        if request.expected_strategy_version is not None and request.expected_strategy_version != session.strategy.strategy_version:
+            raise ValueError("策略版本已变化，请刷新页面并重新检查通道后再执行。")
+        if request.expected_strategy_hash and request.expected_strategy_hash != current_hash:
+            raise ValueError("策略内容已变化，请刷新页面并重新检查通道后再执行。")
         ok, reason = self.validator.can_execute(session.strategy, preview_ready=session.preview is not None, automation_job_id=session.automation_job_id)
         if not ok:
             raise ValueError(reason)
@@ -257,6 +313,11 @@ class HuntCopilotService:
     def _assistant_for_current_state(self, session: CopilotSession, *, fallback: str = "") -> str:
         validation = self.validator.validate(session.strategy)
         return self.response_builder.build(session, validation, fallback=fallback)
+
+    def _command_response(self, session: CopilotSession, command) -> str:
+        values = "、".join(command.values)
+        labels = {"keep_only": "仅保留", "replace": "已替换为", "remove": "已移除", "add": "已增加"}
+        return f"目标地区{labels.get(command.operation, '已更新')}：{values}。\n\n" + _current_strategy_summary(session.strategy)
 
     def _planner_context(self, session: CopilotSession) -> dict[str, Any]:
         return {
@@ -423,6 +484,24 @@ class HuntCopilotService:
             strategy_hash=strategy_fingerprint(session.strategy),
         )
 
+    def _sync_job_state(self, session: CopilotSession) -> CopilotSession:
+        if not session.automation_job_id or session.state not in {CopilotState.RUNNING_FULL_SEARCH, CopilotState.FAILED}:
+            return session
+        queue = HuntJobQueue(self.settings.automation_queue_db_path)
+        queue.init_db()
+        job = queue.get(session.automation_job_id) or {}
+        status = str(job.get("status") or "").strip().lower()
+        next_state = None
+        if status in {"completed", "complete", "succeeded", "success", "done"}:
+            next_state = CopilotState.COMPLETED
+        elif status in {"failed", "error", "dead", "cancelled", "canceled"}:
+            next_state = CopilotState.FAILED
+        if next_state and session.state != next_state:
+            session.state = next_state
+            self._touch(session)
+            self.store.save(session)
+        return session
+
     def _require_session(self, session_id: str) -> CopilotSession:
         session = self.store.get(session_id)
         if session is None:
@@ -509,4 +588,15 @@ def _confirmed_summary(strategy: HuntStrategy) -> str:
         f"排除 {', '.join(strategy.exclusions) or '无'}；"
         f"产品关键词 {', '.join(strategy.product_keywords)}；"
         f"硬条件 {required}。下一步请点击通道检查，通过后再决定是否正式执行。"
+    )
+
+
+def _current_strategy_summary(strategy: HuntStrategy) -> str:
+    return (
+        "当前策略卡（仅展示，未修改）："
+        f"目标地区 {_join_values(strategy.target_regions) or '未设置'}；"
+        f"目标客户 {_join_values(strategy.customer_types) or '未设置'}；"
+        f"产品关键词 {_join_values(strategy.product_keywords) or '未设置'}；"
+        f"排除对象 {_join_values(strategy.exclusions) or '无'}；"
+        f"硬条件 {_join_values(strategy.hard_filters.enabled_labels()) or '未设置'}。"
     )

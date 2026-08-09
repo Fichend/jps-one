@@ -15,6 +15,7 @@ import re
 
 from config.settings import Settings, get_settings
 from hunt_copilot.schemas import ConversationRoute, CopilotSession
+from hunt_copilot.strategy_commands import parse_strategy_command
 from tools.llm_client import LLMTool
 from tools.llm_output import parse_json
 
@@ -22,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 
 PLANNER_INTENTS = {"search_requirement", "strategy_patch"}
-CONFIRM_WORDS = {"确认", "确认策略", "可以", "可以的", "ok", "yes", "同意", "就这样", "没问题"}
+CONFIRM_WORDS = {"确认", "确认策略", "确认当前策略", "同意确认", "confirm strategy"}
 SMALLTALK_WORDS = {"hi", "hello", "hey", "你好", "您好", "在吗", "开始", "start"}
 CAPABILITY_PATTERNS = ("你能做什么", "能做什么", "怎么用", "如何使用", "帮我什么", "help", "能力", "功能")
 EXECUTION_PATTERNS = ("开始搜索", "正式执行", "执行搜索", "开始执行", "启动搜索", "run search")
@@ -141,6 +142,11 @@ class ConversationRouter:
             return _route("smalltalk", False, False, confidence=1.0, reason="empty message")
         if lower in SMALLTALK_WORDS:
             return _route("smalltalk", False, False, confidence=1.0, reason="simple greeting")
+        command = parse_strategy_command(text)
+        if command and command.operation == "show":
+            return _route("strategy_query", False, False, action="show_strategy", confidence=1.0, reason="read-only strategy query")
+        if command:
+            return _route("strategy_command", False, True, action="apply_strategy_command", confidence=1.0, reason=f"deterministic {command.operation}")
         if lower in CONFIRM_WORDS:
             return _route("strategy_confirmation", False, False, action="confirm_strategy", confidence=1.0, reason="explicit confirmation")
         if any(pattern in lower for pattern in ("取消", "cancel")):
@@ -149,7 +155,7 @@ class ConversationRouter:
             return _route("restart_session", False, False, action="restart_session", confidence=1.0, reason="restart request")
         if any(pattern in lower for pattern in EXECUTION_PATTERNS):
             return _route("execution_confirmation", False, False, action="confirm_execution", confidence=0.95, reason="execution request")
-        if "通道" in lower or "检查" in lower:
+        if any(pattern in lower for pattern in ("检查通道", "通道检查", "检测通道", "channel check")):
             return _route("channel_check_request", False, False, action="check_channels", confidence=0.9, reason="channel check request")
         if any(pattern in lower for pattern in CAPABILITY_PATTERNS):
             return _route("capability_help", False, False, confidence=0.95, reason="capability/help question")
