@@ -317,7 +317,8 @@ class HuntCopilotService:
     def _command_response(self, session: CopilotSession, command) -> str:
         values = "、".join(command.values)
         labels = {"keep_only": "仅保留", "replace": "已替换为", "remove": "已移除", "add": "已增加"}
-        return f"目标地区{labels.get(command.operation, '已更新')}：{values}。\n\n" + _current_strategy_summary(session.strategy)
+        field_label = {"target_regions": "目标地区", "product_keywords": "产品关键词", "customer_types": "目标客户"}.get(command.field, command.field)
+        return f"{field_label}{labels.get(command.operation, '已更新')}：{values}。\n\n" + _current_strategy_summary(session.strategy)
 
     def _planner_context(self, session: CopilotSession) -> dict[str, Any]:
         return {
