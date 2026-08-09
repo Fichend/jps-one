@@ -148,7 +148,11 @@ export function useHuntCopilotSession({ onExecuted }: { onExecuted: (jobId: stri
     updateBudget,
     confirmStrategy: () => session && confirmStrategyMutation.mutate(session.session_id),
     checkChannels: () => session && checkChannelsMutation.mutate(session.session_id),
-    execute: () => session && executeMutation.mutate(session.session_id),
+    execute: () => session && executeMutation.mutate({
+      sessionId: session.session_id,
+      strategyVersion: session.strategy_version,
+      strategyHash: session.strategy_hash,
+    }),
     loadSession: (sessionId: string) => loadSessionMutation.mutate(sessionId),
     duplicateSession: (sessionId: string) => duplicateSessionMutation.mutate(sessionId),
   };

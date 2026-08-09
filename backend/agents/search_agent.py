@@ -781,6 +781,7 @@ async def search_node(state: HuntState) -> dict:
             customer_types=customer_types,
             product_keywords=product_keywords,
             target_regions=goal_regions,
+            max_candidates=max_candidates,
         )
         if len(preview_pool) < max(1, int(max_candidates * 0.8)):
             logger.info(
@@ -807,6 +808,7 @@ async def search_node(state: HuntState) -> dict:
         customer_types=customer_types,
         product_keywords=product_keywords,
         target_regions=goal_regions,
+        max_candidates=max_candidates,
     )
     if existing_candidate_pool and not candidate_pool:
         candidate_pool = list(existing_candidate_pool)

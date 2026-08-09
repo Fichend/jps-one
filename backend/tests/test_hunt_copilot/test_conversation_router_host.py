@@ -75,3 +75,46 @@ def test_service_records_conversation_memory_for_strategy_patch(tmp_path):
     assert session.last_user_intent == "search_requirement"
     assert session.conversation_summary
     assert session.recent_strategy_changes
+
+
+def test_country_commands_reproduce_and_fix_brazil_conversation(tmp_path):
+    store = HuntCopilotStore(str(tmp_path / "sessions.json"))
+    service = HuntCopilotService(store=store, settings=_settings(tmp_path))
+    session = _session()
+    session.strategy.target_regions = ["Brazil", "Mexico", "Spain"]
+    session.strategy.customer_types = ["medical distributor"]
+    session.strategy.product_keywords = ["sterilization indicator"]
+    store.save(session)
+
+    session, _ = service.send("s1", "只要brazil")
+    assert session.strategy.target_regions == ["Brazil"]
+
+    session.strategy.target_regions = ["Brazil", "Mexico", "Spain"]
+    store.save(session)
+    session, _ = service.send("s1", "地区不要mexico和spain")
+    assert session.strategy.target_regions == ["Brazil"]
+    assert {"Mexico", "Spain"}.issubset(set(session.strategy.exclusions))
+
+    before = session.strategy.model_dump()
+    session, assistant = service.send("s1", "最终策略卡是什么")
+    assert session.strategy.model_dump() == before
+    assert "Brazil" in assistant
+    assert session.last_user_intent == "strategy_query"
+
+
+def test_target_region_field_assignment_replaces_instead_of_union(tmp_path):
+    store = HuntCopilotStore(str(tmp_path / "sessions.json"))
+    service = HuntCopilotService(store=store, settings=_settings(tmp_path))
+    session = _session()
+    session.strategy.target_regions = ["Mexico", "Spain"]
+    store.save(session)
+
+    session, _ = service.send("s1", "目标地区：brazil")
+
+    assert session.strategy.target_regions == ["Brazil"]
+
+
+def test_plain_approval_does_not_confirm_strategy():
+    route = ConversationRouter(_settings()).route("没问题", _session())
+
+    assert route.action != "confirm_strategy"

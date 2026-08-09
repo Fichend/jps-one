@@ -1279,10 +1279,16 @@ export const api = {
       method: "POST",
     }),
 
-  executeHuntCopilot: (sessionId: string) =>
+  executeHuntCopilot: ({ sessionId, strategyVersion, strategyHash }: { sessionId: string; strategyVersion: number; strategyHash: string }) =>
     request<HuntCopilotExecutionResponse>(`/hunt-copilot/sessions/${sessionId}/execute`, {
       method: "POST",
-      body: JSON.stringify({ enable_email_craft: false, email_template_examples: [], email_template_notes: "" }),
+      body: JSON.stringify({
+        enable_email_craft: false,
+        email_template_examples: [],
+        email_template_notes: "",
+        expected_strategy_version: strategyVersion,
+        expected_strategy_hash: strategyHash,
+      }),
     }),
 
   listHuntCopilotSkills: () =>

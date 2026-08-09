@@ -174,12 +174,16 @@ LOCALE_PROFILES: tuple[LocaleProfile, ...] = (
         customer_terms={
             "school": ("faculdade de odontologia", "escola de odontologia", "universidade odontologia"),
             "distributor": ("distribuidor de equipamentos odontológicos", "fornecedor odontológico", "dental distribuidora"),
+            "medical_distributor": ("distribuidor de produtos médicos", "fornecedor hospitalar", "distribuidor de materiais para esterilização"),
+            "sterilization_supplier": ("fornecedor de produtos para esterilização", "distribuidor de indicadores de esterilização", "fornecedor de CME hospitalar"),
             "clinic": ("clínica odontológica",),
         },
         product_terms={
             "dental simulator": ("simulador odontológico", "equipamento de simulação odontológica", "phantom head odontológico"),
             "phantom head": ("phantom head odontológico",),
             "dental equipment": ("equipamentos odontológicos",),
+            "sterilization monitoring": ("indicador químico de esterilização", "indicador biológico de esterilização", "monitoramento de esterilização"),
+            "sterilization pouch": ("envelope para esterilização", "embalagem para esterilização", "papel grau cirúrgico"),
         },
         generic_contact_terms=("contato", "email", "telefone"),
     ),
@@ -258,7 +262,12 @@ class LocaleKeywordExpander:
         if any(token in text for token in ("school", "college", "university", "training", "学校", "大学", "学院")):
             selected.extend(profile.customer_terms.get("school", ()))
         if any(token in text for token in ("distributor", "dealer", "supplier", "wholesale", "经销", "代理", "供应")):
-            selected.extend(profile.customer_terms.get("distributor", ()))
+            if any(token in text for token in ("steriliz", "infection control", "灭菌", "消毒", "cme")):
+                selected.extend(profile.customer_terms.get("sterilization_supplier", ()))
+            elif any(token in text for token in ("medical", "hospital", "医疗", "医院")):
+                selected.extend(profile.customer_terms.get("medical_distributor", ()))
+            else:
+                selected.extend(profile.customer_terms.get("distributor", ()))
         if any(token in text for token in ("clinic", "诊所")):
             selected.extend(profile.customer_terms.get("clinic", ()))
         return _dedupe(selected)
@@ -273,6 +282,10 @@ class LocaleKeywordExpander:
             selected.extend(profile.product_terms.get("phantom head", ()))
         if any(token in text for token in ("dental equipment", "equipment", "牙科设备", "设备")):
             selected.extend(profile.product_terms.get("dental equipment", ()))
+        if any(token in text for token in ("steriliz", "indicator", "autoclave", "灭菌", "消毒", "指示剂")):
+            selected.extend(profile.product_terms.get("sterilization monitoring", ()))
+        if any(token in text for token in ("pouch", "包装袋", "灭菌袋", "卷袋")):
+            selected.extend(profile.product_terms.get("sterilization pouch", ()))
         return _dedupe(selected)
 
 

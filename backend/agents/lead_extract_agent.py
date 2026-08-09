@@ -93,12 +93,7 @@ def _lead_has_required_field(lead: dict, field: str) -> bool:
 
 
 def _apply_hard_filters(leads: list[dict], search_budget: dict[str, Any]) -> tuple[list[dict], list[dict]]:
-    """Annotate required-field gaps without deleting candidates.
-
-    Historical behavior physically removed leads missing required fields. Hunt
-    Copilot now uses these requirements as strong ranking signals, so all leads
-    stay available for candidate_pool review and backup ordering.
-    """
+    """Enforce user-declared hard fields after enrichment."""
     filters = search_budget.get("hard_filters") if isinstance(search_budget.get("hard_filters"), dict) else {}
     if not filters:
         return leads, []
@@ -106,19 +101,21 @@ def _apply_hard_filters(leads: list[dict], search_budget: dict[str, Any]) -> tup
     if not enabled:
         return leads, []
 
-    annotated: list[dict] = []
+    accepted: list[dict] = []
+    rejected: list[dict] = []
     for lead in leads:
         missing = [field for field in enabled if not _lead_has_required_field(lead, field)]
         if missing:
-            lead["candidate_status"] = "needs_enrichment"
+            lead["candidate_status"] = "excluded_by_rule"
             lead["missing_fields"] = [field.replace("require_", "") for field in missing]
             lead["rejection_reasons"] = [f"missing_{field.replace('require_', '')}" for field in missing]
+            rejected.append(lead)
         else:
             lead["candidate_status"] = "enriched"
             lead["missing_fields"] = []
             lead["rejection_reasons"] = []
-        annotated.append(lead)
-    return annotated, []
+            accepted.append(lead)
+    return accepted, rejected
 
 
 def set_progress_callback(cb: Callable[[dict], None] | None) -> None:
@@ -795,7 +792,7 @@ def _ranked_candidate_pool(candidates: list[dict]) -> list[dict]:
         if not isinstance(item, dict):
             continue
         status = str(item.get("candidate_status") or "").strip()
-        if status in {"excluded_by_rule", "low_relevance_social"}:
+        if status in {"excluded_by_rule", "excluded_by_goal", "low_relevance_social"}:
             continue
         filtered.append(item)
     return sorted(
@@ -1754,6 +1751,7 @@ async def lead_extract_node(state: HuntState) -> dict:
         customer_types=customer_types,
         product_keywords=product_keywords,
         target_regions=target_regions,
+        max_candidates=int(search_budget.get("max_candidates") or max(target_final * 4, target_final)),
     )
     candidate_pool = merge_leads_into_candidates(candidate_pool, combined_leads)
     candidate_pool = rank_candidates(

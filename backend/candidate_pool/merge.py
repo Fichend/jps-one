@@ -237,6 +237,7 @@ def build_candidate_pool(
     customer_types: list[str] | None = None,
     product_keywords: list[str] | None = None,
     target_regions: list[str] | None = None,
+    max_candidates: int | None = None,
 ) -> list[dict[str, Any]]:
     candidates: dict[str, dict[str, Any]] = {}
     aliases: dict[str, str] = {}
@@ -281,7 +282,7 @@ def build_candidate_pool(
     )
     profiled = normalize_candidate_profiles(goal_checked)
     scored = [apply_score(candidate) for candidate in profiled]
-    return rank_candidates(
+    ranked = rank_candidates(
         scored,
         target_final_leads=target_final_leads,
         hard_filters=hard_filters or {},
@@ -290,6 +291,9 @@ def build_candidate_pool(
         product_keywords=product_keywords or [],
         target_regions=target_regions or [],
     )
+    if max_candidates is not None:
+        return ranked[: max(1, int(max_candidates))]
+    return ranked
 
 
 def _clean_list(values: Any) -> list[str]:
