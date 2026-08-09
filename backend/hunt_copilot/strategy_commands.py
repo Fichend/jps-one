@@ -32,6 +32,17 @@ COUNTRY_ALIASES = {
     "japan": "Japan", "日本": "Japan",
     "south korea": "South Korea", "korea": "South Korea", "韩国": "South Korea",
     "india": "India", "印度": "India",
+    "china": "China", "pr china": "China", "people's republic of china": "China", "中国": "China", "中华人民共和国": "China",
+    "singapore": "Singapore", "新加坡": "Singapore",
+    "united arab emirates": "United Arab Emirates", "uae": "United Arab Emirates", "阿联酋": "United Arab Emirates",
+    "saudi arabia": "Saudi Arabia", "saudi": "Saudi Arabia", "沙特阿拉伯": "Saudi Arabia", "沙特": "Saudi Arabia",
+    "turkey": "Turkey", "türkiye": "Turkey", "土耳其": "Turkey",
+    "russia": "Russia", "俄罗斯": "Russia",
+    "south africa": "South Africa", "南非": "South Africa",
+    "argentina": "Argentina", "阿根廷": "Argentina",
+    "chile": "Chile", "智利": "Chile",
+    "colombia": "Colombia", "哥伦比亚": "Colombia",
+    "peru": "Peru", "秘鲁": "Peru",
 }
 
 

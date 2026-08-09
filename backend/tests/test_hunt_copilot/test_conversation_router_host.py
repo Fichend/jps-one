@@ -114,6 +114,19 @@ def test_target_region_field_assignment_replaces_instead_of_union(tmp_path):
     assert session.strategy.target_regions == ["Brazil"]
 
 
+def test_keep_only_china_replaces_existing_countries_from_reported_ui_case(tmp_path):
+    store = HuntCopilotStore(str(tmp_path / "sessions.json"))
+    service = HuntCopilotService(store=store, settings=_settings(tmp_path))
+    session = _session()
+    session.strategy.target_regions = ["Mexico", "Brazil", "China"]
+    store.save(session)
+
+    session, assistant = service.send("s1", "只要中国")
+
+    assert session.strategy.target_regions == ["China"]
+    assert "仅保留：China" in assistant
+
+
 def test_plain_approval_does_not_confirm_strategy():
     route = ConversationRouter(_settings()).route("没问题", _session())
 
