@@ -114,6 +114,54 @@ def test_target_region_field_assignment_replaces_instead_of_union(tmp_path):
     assert session.strategy.target_regions == ["Brazil"]
 
 
+def test_keep_only_china_replaces_existing_countries_from_reported_ui_case(tmp_path):
+    store = HuntCopilotStore(str(tmp_path / "sessions.json"))
+    service = HuntCopilotService(store=store, settings=_settings(tmp_path))
+    session = _session()
+    session.strategy.target_regions = ["Mexico", "Brazil", "China"]
+    store.save(session)
+
+    session, assistant = service.send("s1", "只要中国")
+
+    assert session.strategy.target_regions == ["China"]
+    assert "仅保留：China" in assistant
+
+
+def test_remove_brazil_from_product_does_not_remove_brazil_region(tmp_path):
+    store = HuntCopilotStore(str(tmp_path / "sessions.json"))
+    service = HuntCopilotService(store=store, settings=_settings(tmp_path))
+    session = _session()
+    session.strategy.target_regions = ["Brazil"]
+    session.strategy.customer_types = ["sterilization supplier"]
+    session.strategy.product_keywords = ["brazil", "sterilization"]
+    session.strategy.exclusions = ["Mexico", "Spain"]
+    store.save(session)
+
+    session, assistant = service.send("s1", "产品去掉brazil")
+
+    assert session.strategy.target_regions == ["Brazil"]
+    assert session.strategy.product_keywords == ["sterilization"]
+    assert session.strategy.exclusions == ["Mexico", "Spain"]
+    assert "产品关键词已移除：brazil" in assistant
+
+
+def test_keep_only_customer_type_does_not_mutate_products_or_regions(tmp_path):
+    store = HuntCopilotStore(str(tmp_path / "sessions.json"))
+    service = HuntCopilotService(store=store, settings=_settings(tmp_path))
+    session = _session()
+    session.strategy.target_regions = ["Brazil"]
+    session.strategy.customer_types = ["hospital", "sterilization supplier"]
+    session.strategy.product_keywords = ["sterilization indicator"]
+    store.save(session)
+
+    session, assistant = service.send("s1", "目标客户只保留sterilization supplier")
+
+    assert session.strategy.target_regions == ["Brazil"]
+    assert session.strategy.customer_types == ["sterilization supplier"]
+    assert session.strategy.product_keywords == ["sterilization indicator"]
+    assert "目标客户仅保留：sterilization supplier" in assistant
+
+
 def test_plain_approval_does_not_confirm_strategy():
     route = ConversationRouter(_settings()).route("没问题", _session())
 

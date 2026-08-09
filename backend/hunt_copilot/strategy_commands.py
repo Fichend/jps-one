@@ -32,6 +32,17 @@ COUNTRY_ALIASES = {
     "japan": "Japan", "日本": "Japan",
     "south korea": "South Korea", "korea": "South Korea", "韩国": "South Korea",
     "india": "India", "印度": "India",
+    "china": "China", "pr china": "China", "people's republic of china": "China", "中国": "China", "中华人民共和国": "China",
+    "singapore": "Singapore", "新加坡": "Singapore",
+    "united arab emirates": "United Arab Emirates", "uae": "United Arab Emirates", "阿联酋": "United Arab Emirates",
+    "saudi arabia": "Saudi Arabia", "saudi": "Saudi Arabia", "沙特阿拉伯": "Saudi Arabia", "沙特": "Saudi Arabia",
+    "turkey": "Turkey", "türkiye": "Turkey", "土耳其": "Turkey",
+    "russia": "Russia", "俄罗斯": "Russia",
+    "south africa": "South Africa", "南非": "South Africa",
+    "argentina": "Argentina", "阿根廷": "Argentina",
+    "chile": "Chile", "智利": "Chile",
+    "colombia": "Colombia", "哥伦比亚": "Colombia",
+    "peru": "Peru", "秘鲁": "Peru",
 }
 
 
@@ -47,6 +58,13 @@ def parse_strategy_command(message: str) -> StrategyCommand | None:
     lower = text.lower()
     if _is_strategy_query(lower):
         return StrategyCommand("show")
+
+    product_command = _parse_product_command(text)
+    if product_command is not None:
+        return product_command
+    customer_command = _parse_customer_command(text)
+    if customer_command is not None:
+        return customer_command
 
     countries = _countries_in_text(lower)
     if not countries:
@@ -82,13 +100,14 @@ def apply_strategy_command(strategy: HuntStrategy, command: StrategyCommand, *, 
     elif command.operation == "remove":
         blocked = {item.casefold() for item in values}
         result = [item for item in current if item.casefold() not in blocked]
-        updated.exclusions = _unique([*updated.exclusions, *values])
+        if command.field == "target_regions":
+            updated.exclusions = _unique([*updated.exclusions, *values])
     elif command.operation == "add":
         result = _unique([*current, *values])
     else:
         return updated
     setattr(updated, command.field, _unique(result))
-    if command.operation in {"keep_only", "replace"}:
+    if command.field == "target_regions" and command.operation in {"keep_only", "replace"}:
         kept = {item.casefold() for item in values}
         updated.exclusions = [item for item in updated.exclusions if item.casefold() not in kept]
     if raw_message.strip():
@@ -119,6 +138,59 @@ def _is_strategy_query(text: str) -> bool:
     return any(item in text for item in strategy_markers) and any(item in text for item in query_markers) and not any(
         item in text for item in ("改成", "改为", "设置为", "删除", "移除", "只要", "只保留")
     )
+
+
+def _parse_product_command(text: str) -> StrategyCommand | None:
+    return _parse_explicit_list_command(
+        text,
+        field="product_keywords",
+        field_pattern=r"(?:产品关键词|产品|关键词|product\s+keywords?)\s*",
+    )
+
+
+def _parse_customer_command(text: str) -> StrategyCommand | None:
+    return _parse_explicit_list_command(
+        text,
+        field="customer_types",
+        field_pattern=r"(?:目标客户类型|目标客户|客户类型|customer\s+types?)\s*",
+    )
+
+
+def _parse_explicit_list_command(text: str, *, field: str, field_pattern: str) -> StrategyCommand | None:
+    lower = text.lower().strip()
+    other_fields = {
+        "product_keywords": ("目标地区", "目标国家", "目标客户", "客户类型", "target region", "customer type"),
+        "customer_types": ("目标地区", "目标国家", "产品关键词", "产品：", "target region", "product keyword"),
+    }
+    if any(marker in lower for marker in other_fields.get(field, ())):
+        return None
+    field_match = re.search(field_pattern, lower)
+    if not field_match:
+        return None
+    operations = (
+        ("keep_only", ("只保留", "仅保留", "只要", "只用", "only")),
+        ("remove", ("去掉", "删除", "移除", "排除", "不要", "remove", "exclude")),
+        ("replace", ("改成", "改为", "替换为", "设置为", "设为", "replace")),
+        ("add", ("增加", "添加", "加上", "新增", "add")),
+    )
+    operation = next((name for name, markers in operations if any(marker in lower for marker in markers)), "")
+    if not operation:
+        return None
+    payload = lower[field_match.end():]
+    for _, markers in operations:
+        for marker in markers:
+            payload = payload.removeprefix(marker).strip()
+    payload = payload.lstrip(":： ")
+    values = _split_command_values(payload)
+    if not values:
+        return None
+    return StrategyCommand(operation, field, tuple(values))
+
+
+def _split_command_values(payload: str) -> list[str]:
+    clean = re.split(r"[。；;!?！？]", str(payload or "").strip(), maxsplit=1)[0]
+    parts = re.split(r"\s*(?:,|，|、|\band\b|以及)\s*", clean, flags=re.IGNORECASE)
+    return _unique([item.strip(" '\"") for item in parts if item.strip(" '\"")])
 
 
 def _countries_in_text(text: str) -> list[str]:
