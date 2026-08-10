@@ -32,7 +32,15 @@ from hunt_copilot.state_machine import allowed_actions, choose_state
 from hunt_copilot.store import HuntCopilotStore
 from hunt_copilot.strategy_fingerprint import strategy_fingerprint, strategy_similarity
 from hunt_copilot.strategy_critic import StrategyCritic
-from hunt_copilot.strategy_commands import apply_strategy_command, command_applied, parse_strategy_command
+from hunt_copilot.strategy_commands import (
+    FIELD_LABELS,
+    CommandApplication,
+    StrategyCommand,
+    apply_strategy_command,
+    business_fields_equal,
+    command_applied,
+    parse_strategy_command,
+)
 from hunt_copilot.validator import StrategyValidator
 from search_tools import list_tool_status
 from tool_executor import ToolExecutor, build_tool_plan
@@ -72,35 +80,16 @@ class HuntCopilotService:
             route = self.conversation_router.route(message, session)
             session.last_user_intent = route.intent
             command = parse_strategy_command(message)
-            if command and command.operation != "show":
-                before = session.strategy.model_copy(deep=True)
-                session.strategy = apply_strategy_command(session.strategy, command, raw_message=message)
-                session.recent_strategy_changes = _strategy_changes(before, session.strategy)
-                session.selected_skill = self.skill_selector.select(text=message, strategy=session.strategy)
-                assistant = self._command_response(session, command)
-            elif command and command.operation == "show":
-                assistant = _current_strategy_summary(session.strategy)
-            elif route.should_call_planner and route.should_update_strategy:
-                before = session.strategy.model_copy(deep=True)
-                planner_response = self.llm_planner.plan(message, session.strategy, session.state.value, **self._planner_context(session))
-                session.detected_conflicts = planner_response.detected_conflicts
-                session.strategy = self.patch_merger.merge(session.strategy, planner_response.strategy_patch, raw_message=message)
-                session.recent_strategy_changes = _strategy_changes(before, session.strategy)
-                session.selected_skill = self.skill_selector.select(text=message, strategy=session.strategy)
-                assistant = self._assistant_for_current_state(session, fallback=planner_response.assistant_message)
-            else:
-                assistant = self.conversation_host.reply(route, session, message)
+            self._touch(session)
+            self.store.save(session)
+            if command is not None:
+                return self._execute_command(session, command, message)
+            if route.should_call_planner and route.should_update_strategy:
+                return self._execute_planner_change(session, message)
+            assistant = self.conversation_host.reply(route, session, message)
         else:
             assistant = _opening_message()
-        self._refresh_controls(session)
-        self._update_memory(session, assistant)
-        self._append_assistant(session, assistant)
-        self.store.save(session)
-        if message.strip():
-            command = parse_strategy_command(message)
-            if command is not None and not command_applied(self._require_session(session.session_id).strategy, command):
-                raise RuntimeError("策略修改保存校验失败，请勿执行搜索。")
-        return session, assistant
+        return self._finalize_non_mutating(session, assistant)
 
     def send(self, session_id: str, message: str) -> tuple[CopilotSession, str]:
         session = self._require_session(session_id)
@@ -109,44 +98,10 @@ class HuntCopilotService:
         session.last_user_intent = route.intent
         command = parse_strategy_command(message)
         if command is not None:
-            if command.operation == "show":
-                assistant = _current_strategy_summary(session.strategy)
-            else:
-                before = session.strategy.model_copy(deep=True)
-                session.strategy = apply_strategy_command(session.strategy, command, raw_message=message)
-                session.detected_conflicts = []
-                session.recent_strategy_changes = _strategy_changes(before, session.strategy)
-                session.selected_skill = self.skill_selector.select(text=message, strategy=session.strategy)
-                session.preview = None
-                if session.state == CopilotState.CHANNEL_CHECK_FAILED:
-                    session.state = CopilotState.COLLECTING_REQUIREMENTS
-                self._refresh_controls(session)
-                assistant = self._command_response(session, command)
-            self._refresh_controls(session)
-            self._append_assistant(session, assistant)
-            self._update_memory(session, assistant)
-            self._touch(session)
-            self.store.save(session)
-            persisted = self._require_session(session_id)
-            if not command_applied(persisted.strategy, command):
-                raise RuntimeError("策略修改保存校验失败，请勿执行搜索。")
-            logger.info(
-                "hunt_strategy_command session=%s operation=%s field=%s values=%s version=%s verified=true",
-                session_id,
-                command.operation,
-                command.field,
-                list(command.values),
-                persisted.strategy.strategy_version,
-            )
-            return persisted, assistant
+            return self._execute_command(session, command, message)
         if route.intent in {"smalltalk", "general_question", "capability_help", "strategy_discussion", "strategy_query", "off_topic"}:
-            self._refresh_controls(session)
             assistant = self.conversation_host.reply(route, session, message)
-            self._append_assistant(session, assistant)
-            self._update_memory(session, assistant)
-            self._touch(session)
-            self.store.save(session)
-            return session, assistant
+            return self._finalize_non_mutating(session, assistant)
         if route.action == "confirm_strategy":
             ok, assistant = self._confirm_strategy(session)
             if not ok:
@@ -173,16 +128,7 @@ class HuntCopilotService:
             session.recent_strategy_changes = ["已清空当前策略，重新开始。"]
             assistant = "已重新开始。请告诉我这次要找的国家、客户类型、产品关键词和硬条件。"
         else:
-            before = session.strategy.model_copy(deep=True)
-            planner_response = self.llm_planner.plan(message, session.strategy, session.state.value, **self._planner_context(session))
-            session.detected_conflicts = planner_response.detected_conflicts
-            session.strategy = self.patch_merger.merge(session.strategy, planner_response.strategy_patch, raw_message=message)
-            session.recent_strategy_changes = _strategy_changes(before, session.strategy)
-            session.selected_skill = self.skill_selector.select(text=message, strategy=session.strategy)
-            if session.state == CopilotState.CHANNEL_CHECK_FAILED:
-                session.state = CopilotState.COLLECTING_REQUIREMENTS
-            self._refresh_controls(session)
-            assistant = self._assistant_for_current_state(session, fallback=planner_response.assistant_message)
+            return self._execute_planner_change(session, message)
         self._refresh_controls(session)
         self._update_memory(session, assistant)
         self._append_assistant(session, assistant)
@@ -190,23 +136,153 @@ class HuntCopilotService:
         self.store.save(session)
         return session, assistant
 
+    def _execute_command(self, session: CopilotSession, command: StrategyCommand, raw_message: str) -> tuple[CopilotSession, str]:
+        if command.operation == "query":
+            return self._finalize_non_mutating(session, _current_strategy_summary(session.strategy))
+        if command.operation == "clarify":
+            return self._finalize_non_mutating(session, command.clarification or "请明确要修改哪个策略字段。")
+        if command.operation == "undo":
+            return self._undo_last_change(session)
+
+        before = session.strategy.model_copy(deep=True)
+        application = apply_strategy_command(before, command, raw_message=raw_message)
+        if not application.changed:
+            assistant = self._command_no_change_response(before, command, application)
+            return self._finalize_non_mutating(session, assistant)
+
+        self._push_snapshot(session, before, raw_message)
+        session.strategy = application.strategy
+        session.detected_conflicts = []
+        session.recent_strategy_changes = _strategy_changes(before, session.strategy)
+        session.selected_skill = self.skill_selector.select(text=raw_message, strategy=session.strategy)
+        session.preview = None
+        if session.state == CopilotState.CHANNEL_CHECK_FAILED:
+            session.state = CopilotState.COLLECTING_REQUIREMENTS
+        self._refresh_controls(session)
+        self._touch(session)
+        self.store.save(session)
+
+        persisted = self._verified_session(session.session_id, application.strategy)
+        assistant = self._command_response(before, persisted.strategy, command, application)
+        self._append_assistant(persisted, assistant)
+        self._update_memory(persisted, assistant)
+        self._touch(persisted)
+        self.store.save(persisted)
+        verified = self._require_session(session.session_id)
+        logger.info(
+            "hunt_strategy_command session=%s command=%s version=%s verified=true",
+            session.session_id,
+            command.as_dict(),
+            verified.strategy.strategy_version,
+        )
+        return verified, assistant
+
+    def _execute_planner_change(self, session: CopilotSession, message: str) -> tuple[CopilotSession, str]:
+        before = session.strategy.model_copy(deep=True)
+        planner_response = self.llm_planner.plan(message, before, session.state.value, **self._planner_context(session))
+        expected = self.patch_merger.merge(before, planner_response.strategy_patch, raw_message=message)
+        changed = not business_fields_equal(before, expected)
+        if changed:
+            self._push_snapshot(session, before, message)
+        session.strategy = expected
+        session.detected_conflicts = planner_response.detected_conflicts
+        session.recent_strategy_changes = _strategy_changes(before, expected)
+        session.selected_skill = self.skill_selector.select(text=message, strategy=expected)
+        session.preview = None if changed else session.preview
+        if changed and session.state == CopilotState.CHANNEL_CHECK_FAILED:
+            session.state = CopilotState.COLLECTING_REQUIREMENTS
+        self._refresh_controls(session)
+        self._touch(session)
+        self.store.save(session)
+
+        persisted = self._verified_session(session.session_id, expected)
+        if changed:
+            assistant = _verified_change_summary(before, persisted.strategy) + "\n" + self._assistant_for_current_state(persisted)
+        else:
+            assistant = "本次没有识别到可保存的策略字段，策略未修改。" + self._assistant_for_current_state(persisted)
+        self._append_assistant(persisted, assistant)
+        self._update_memory(persisted, assistant)
+        self._touch(persisted)
+        self.store.save(persisted)
+        return self._require_session(session.session_id), assistant
+
+    def _undo_last_change(self, session: CopilotSession) -> tuple[CopilotSession, str]:
+        if not session.strategy_snapshots:
+            return self._finalize_non_mutating(session, "没有可撤销的策略修改，本次未修改策略。")
+        before = session.strategy.model_copy(deep=True)
+        snapshot = session.strategy_snapshots.pop()
+        restored = HuntStrategy.model_validate(snapshot.get("strategy") or {})
+        if business_fields_equal(before, restored):
+            return self._finalize_non_mutating(session, "上一份策略快照与当前策略相同，本次未修改策略。")
+        restored.strategy_version = before.strategy_version + 1
+        restored.strategy_confirmed = False
+        restored.needs_recheck = True
+        session.strategy = restored
+        session.preview = None
+        session.detected_conflicts = []
+        session.recent_strategy_changes = _strategy_changes(before, restored)
+        session.selected_skill = self.skill_selector.select(strategy=restored)
+        self._refresh_controls(session)
+        self._touch(session)
+        self.store.save(session)
+        persisted = self._verified_session(session.session_id, restored)
+        assistant = "已撤销刚才的修改。" + _verified_change_summary(before, persisted.strategy)
+        self._append_assistant(persisted, assistant)
+        self._update_memory(persisted, assistant)
+        self._touch(persisted)
+        self.store.save(persisted)
+        return self._require_session(session.session_id), assistant
+
+    def _push_snapshot(self, session: CopilotSession, strategy: HuntStrategy, reason: str) -> None:
+        session.strategy_snapshots.append(
+            {"strategy": strategy.model_dump(mode="json"), "reason": reason.strip(), "created_at": now_iso()}
+        )
+        session.strategy_snapshots = session.strategy_snapshots[-20:]
+
+    def _verified_session(self, session_id: str, expected: HuntStrategy) -> CopilotSession:
+        persisted = self._require_session(session_id)
+        if not command_applied(persisted.strategy, expected):
+            raise RuntimeError("策略修改保存校验失败，请勿执行搜索。")
+        return persisted
+
+    def _finalize_non_mutating(self, session: CopilotSession, assistant: str) -> tuple[CopilotSession, str]:
+        before = session.strategy.model_dump(mode="json")
+        self._refresh_controls(session)
+        self._append_assistant(session, assistant)
+        self._update_memory(session, assistant)
+        self._touch(session)
+        self.store.save(session)
+        persisted = self._require_session(session.session_id)
+        if persisted.strategy.model_dump(mode="json") != before:
+            raise RuntimeError("只读消息意外修改了策略，请勿执行搜索。")
+        return persisted, assistant
+
     def update_strategy(self, session_id: str, strategy: HuntStrategy) -> tuple[CopilotSession, str]:
         session = self._require_session(session_id)
-        session.strategy = strategy.model_validate(strategy.model_dump())
+        before = session.strategy.model_copy(deep=True)
+        updated = strategy.model_copy(deep=True)
+        if business_fields_equal(before, updated):
+            return self._finalize_non_mutating(session, "策略卡内容没有变化，本次未修改策略。")
+        updated.strategy_version = before.strategy_version + 1
+        updated.strategy_confirmed = False
+        updated.needs_recheck = True
+        self._push_snapshot(session, before, "手动编辑策略卡")
+        session.strategy = HuntStrategy.model_validate(updated.model_dump())
         session.detected_conflicts = []
-        session.strategy.strategy_version += 1
-        session.strategy.strategy_confirmed = False
-        session.strategy.needs_recheck = True
         session.preview = None
         session.selected_skill = self.skill_selector.select(strategy=session.strategy)
         if session.state == CopilotState.CHANNEL_CHECK_FAILED:
             session.state = CopilotState.COLLECTING_REQUIREMENTS
         self._refresh_controls(session)
-        assistant = self._assistant_for_current_state(session)
-        self._append_assistant(session, assistant)
         self._touch(session)
         self.store.save(session)
-        return session, assistant
+        persisted = self._verified_session(session_id, session.strategy)
+        assistant = _verified_change_summary(before, persisted.strategy)
+        self._append_assistant(persisted, assistant)
+        self._update_memory(persisted, assistant)
+        self._touch(persisted)
+        self.store.save(persisted)
+        return self._require_session(session_id), assistant
 
     def confirm_strategy(self, session_id: str) -> tuple[CopilotSession, str]:
         session = self._require_session(session_id)
@@ -314,11 +390,57 @@ class HuntCopilotService:
         validation = self.validator.validate(session.strategy)
         return self.response_builder.build(session, validation, fallback=fallback)
 
-    def _command_response(self, session: CopilotSession, command) -> str:
-        values = "、".join(command.values)
-        labels = {"keep_only": "仅保留", "replace": "已替换为", "remove": "已移除", "add": "已增加"}
-        field_label = {"target_regions": "目标地区", "product_keywords": "产品关键词", "customer_types": "目标客户"}.get(command.field, command.field)
-        return f"{field_label}{labels.get(command.operation, '已更新')}：{values}。\n\n" + _current_strategy_summary(session.strategy)
+    def _command_response(
+        self,
+        before: HuntStrategy,
+        after: HuntStrategy,
+        command: StrategyCommand,
+        application: CommandApplication,
+    ) -> str:
+        field_label = FIELD_LABELS.get(command.field, command.field)
+        action = {
+            "add": "增加",
+            "remove": "删除",
+            "replace": "替换",
+            "keep_only": "仅保留",
+            "clear": "清空",
+        }.get(command.operation, "更新")
+        values = _join_values(list(command.values))
+        if command.operation == "remove" and application.removed:
+            removed = _join_values(application.removed)
+            lead = f"已从{field_label}中删除 {removed}（{field_label}已移除：{removed}）。"
+        elif command.operation == "keep_only":
+            lead = f"{field_label}仅保留：{values}。"
+        elif command.operation == "replace":
+            lead = f"{field_label}已替换为：{values}。"
+        elif command.operation == "add":
+            lead = f"{field_label}已增加：{values}。"
+        elif command.operation == "clear":
+            lead = f"已清空{field_label}。"
+        else:
+            lead = f"已{action}{field_label}{('：' + values) if values else ''}。"
+        response = lead + "\n" + _field_change_line(command.field, application.previous_values, application.current_values)
+        if command.field == "product_keywords":
+            response += f"\n目标地区未变化：{_join_values(after.target_regions) or '未设置'}。"
+        elif command.field == "target_regions":
+            response += f"\n产品关键词未变化：{_join_values(after.product_keywords) or '未设置'}。"
+        conflicts = self.validator.validate(after).detected_conflicts
+        if conflicts:
+            response += "\n需要处理冲突：" + "；".join(conflicts) + "。"
+        return response + "\n右侧策略卡已按保存后的结果更新。"
+
+    def _command_no_change_response(
+        self,
+        strategy: HuntStrategy,
+        command: StrategyCommand,
+        application: CommandApplication,
+    ) -> str:
+        field_label = FIELD_LABELS.get(command.field, command.field or "指定字段")
+        values = _join_values(application.unmatched or list(command.values))
+        if command.operation == "remove" and values:
+            return f"{field_label}中没有找到 {values}，本次没有修改策略。"
+        current = _field_values_for_response(strategy, command.field)
+        return f"{field_label}已经是该状态，本次没有修改策略。当前{field_label}：{_join_values(current) or '未设置'}。"
 
     def _planner_context(self, session: CopilotSession) -> dict[str, Any]:
         return {
@@ -536,9 +658,43 @@ def _strategy_changes(before: HuntStrategy, after: HuntStrategy) -> list[str]:
             changes.append(f"{label}：{_join_values(getattr(after, field)) or '已清空'}")
     if before.hard_filters != after.hard_filters:
         changes.append(f"硬条件：{_join_values(after.hard_filters.enabled_labels()) or '未设置'}")
+    if before.preferred_fields != after.preferred_fields:
+        changes.append(f"优先字段：{_join_values(after.preferred_fields) or '未设置'}")
     if before.budget != after.budget:
         changes.append(f"数量预算：候选 {after.budget.max_candidates}，最终 {after.budget.final_leads}，预算 {after.budget.total_usd:g} USD")
     return changes[:8]
+
+
+def _field_values_for_response(strategy: HuntStrategy, field_name: str) -> list[str]:
+    if field_name in {"target_regions", "customer_types", "product_keywords", "exclusions", "preferred_fields"}:
+        return list(getattr(strategy, field_name))
+    if field_name == "hard_filters":
+        return strategy.hard_filters.enabled_labels()
+    if field_name.startswith("budget."):
+        return [str(getattr(strategy.budget, field_name.split(".", 1)[1]))]
+    return []
+
+
+def _field_change_line(field_name: str, before: list[str], after: list[str]) -> str:
+    label = FIELD_LABELS.get(field_name, field_name)
+    return f"{label}：{_join_values(before) or '未设置'} → {_join_values(after) or '已清空'}。"
+
+
+def _verified_change_summary(before: HuntStrategy, after: HuntStrategy) -> str:
+    lines = ["策略已保存并重新读取，实际修改如下："]
+    for field_name in ("target_regions", "customer_types", "product_keywords", "exclusions", "hard_filters", "preferred_fields"):
+        old_values = _field_values_for_response(before, field_name)
+        new_values = _field_values_for_response(after, field_name)
+        if old_values != new_values:
+            lines.append(_field_change_line(field_name, old_values, new_values))
+    for field_name in ("budget.max_candidates", "budget.final_leads", "budget.total_usd"):
+        old_values = _field_values_for_response(before, field_name)
+        new_values = _field_values_for_response(after, field_name)
+        if old_values != new_values:
+            lines.append(_field_change_line(field_name, old_values, new_values))
+    if len(lines) == 1:
+        lines.append("没有业务字段发生变化。")
+    return "\n".join(lines)
 
 
 def _join_values(values: list[str]) -> str:
@@ -599,5 +755,8 @@ def _current_strategy_summary(strategy: HuntStrategy) -> str:
         f"目标客户 {_join_values(strategy.customer_types) or '未设置'}；"
         f"产品关键词 {_join_values(strategy.product_keywords) or '未设置'}；"
         f"排除对象 {_join_values(strategy.exclusions) or '无'}；"
-        f"硬条件 {_join_values(strategy.hard_filters.enabled_labels()) or '未设置'}。"
+        f"硬条件 {_join_values(strategy.hard_filters.enabled_labels()) or '未设置'}；"
+        f"候选数量 {strategy.budget.max_candidates}；"
+        f"最终数量 {strategy.budget.final_leads}；"
+        f"正式预算 {strategy.budget.total_usd:g} USD。"
     )

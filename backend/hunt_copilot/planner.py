@@ -159,8 +159,8 @@ def _merge_customer_and_product_knowledge(strategy: HuntStrategy, text: str) -> 
         strategy.customer_types = recommendation.normalized_customer_types
     if recommendation.normalized_exclusions:
         strategy.exclusions = recommendation.normalized_exclusions
-    if not strategy.product_keywords and recommendation.recommended_keywords:
-        strategy.product_keywords = recommendation.recommended_keywords
+    # Catalogue matches are recommendations only. The authoritative
+    # product_keywords field changes only after an explicit user instruction.
 
 
 def _remove_excluded_targets(strategy: HuntStrategy) -> None:

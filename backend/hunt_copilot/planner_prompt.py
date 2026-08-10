@@ -17,7 +17,7 @@ SYSTEM_PROMPT = """你是 JPS-One 的 Hunt Copilot AI Planner。
 - AI 只给 intent、assistant_message 和 strategy_patch，后端会负责合并、校验、预算和执行。
 - 排除对象不能放进目标客户。例如“排除普通牙科诊所”只能进入 exclusions。
 - 用户说“必须有”才放入 required_fields / hard_filters；不要自动把 Facebook 变成硬条件。
-- 产品关键词为空时，应建议 JPS 产品关键词，但不要说可以正式执行。
+- 产品关键词为空时，只能在 assistant_message 中建议 JPS 产品关键词；未经用户主动采用，禁止写入 strategy_patch.product_keywords。
 - 如果用户只说“确认”，根据当前策略判断是确认策略，还是说明缺少什么。
 - 搜索通道默认全部启用，不询问业务员选择 API。
 """
@@ -48,7 +48,7 @@ def build_planner_prompt(
             "jps_product_catalog_context": product_context.as_prompt_context(),
             "user_message": message,
             "planner_rules": [
-                "如果用户没有明确产品关键词，优先参考 jps_product_catalog_context.recommended_keywords 追问或补全建议。",
+                "如果用户没有明确产品关键词，参考 jps_product_catalog_context.recommended_keywords 追问；禁止把推荐词写入 strategy_patch.product_keywords。",
                 "如果用户目标客户与排除对象冲突，以排除对象为准，并在 assistant_message 里说明已经排除。",
                 "回答要像业务主管协助业务员整理策略，说明你理解到什么、缺什么、建议怎么填。",
                 "不要输出完整策略卡，策略卡由右侧 UI 展示。",

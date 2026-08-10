@@ -15,7 +15,7 @@ import re
 
 from config.settings import Settings, get_settings
 from hunt_copilot.schemas import ConversationRoute, CopilotSession
-from hunt_copilot.strategy_commands import parse_strategy_command
+from hunt_copilot.strategy_commands import is_strategy_query, looks_like_full_requirement, parse_strategy_command
 from tools.llm_client import LLMTool
 from tools.llm_output import parse_json
 
@@ -23,14 +23,16 @@ logger = logging.getLogger(__name__)
 
 
 PLANNER_INTENTS = {"search_requirement", "strategy_patch"}
-CONFIRM_WORDS = {"确认", "确认策略", "确认当前策略", "同意确认", "confirm strategy"}
+CONFIRM_WORDS = {"确认当前策略", "confirm current strategy"}
+AMBIGUOUS_APPROVAL_WORDS = {"可以", "好的", "好", "没问题", "就这样", "行", "ok", "okay", "yes", "确认", "确认策略", "同意确认"}
 SMALLTALK_WORDS = {"hi", "hello", "hey", "你好", "您好", "在吗", "开始", "start"}
 CAPABILITY_PATTERNS = ("你能做什么", "能做什么", "怎么用", "如何使用", "帮我什么", "help", "能力", "功能")
 EXECUTION_PATTERNS = ("开始搜索", "正式执行", "执行搜索", "开始执行", "启动搜索", "run search")
 SEARCH_MARKERS = (
     "客户", "经销商", "学校", "医院", "诊所", "进口商", "分销", "代理", "采购", "目标", "排除",
     "instagram", "facebook", "邮箱", "电话", "官网", "地址", "候选", "最终", "预算", "产品", "关键词",
-    "customer", "distributor", "dealer", "school", "hospital", "importer", "supplier", "lead", "candidate", "budget",
+    "市场", "精准", "准确率", "难度", "数量",
+    "customer", "distributor", "dealer", "school", "hospital", "importer", "supplier", "lead", "candidate", "budget", "market", "accuracy",
 )
 
 
@@ -48,6 +50,10 @@ class ConversationRouter:
                 self._route_async(text, session),
                 timeout_seconds=max(1, int(self.settings.hunt_copilot_router_timeout_seconds) + 1),
             )
+            if ai_route.intent == "strategy_confirmation" and text.casefold() not in CONFIRM_WORDS:
+                return _route("strategy_discussion", False, False, confidence=1.0, reason="ambiguous confirmation blocked")
+            if is_strategy_query(text):
+                return _route("strategy_query", False, False, action="show_strategy", confidence=1.0, reason="read-only strategy query")
             return ai_route if ai_route.confidence >= 0.55 else rule
         except TimeoutError:
             logger.warning("Hunt Copilot route classification timed out; using fallback route")
@@ -142,18 +148,24 @@ class ConversationRouter:
             return _route("smalltalk", False, False, confidence=1.0, reason="empty message")
         if lower in SMALLTALK_WORDS:
             return _route("smalltalk", False, False, confidence=1.0, reason="simple greeting")
+        if is_strategy_query(text):
+            return _route("strategy_query", False, False, action="show_strategy", confidence=1.0, reason="read-only strategy query")
+        if looks_like_full_requirement(text):
+            return _route("search_requirement", True, True, confidence=1.0, reason="complete search requirement")
         command = parse_strategy_command(text)
-        if command and command.operation == "show":
+        if command and command.operation == "query":
             return _route("strategy_query", False, False, action="show_strategy", confidence=1.0, reason="read-only strategy query")
         if command:
             return _route("strategy_command", False, True, action="apply_strategy_command", confidence=1.0, reason=f"deterministic {command.operation}")
         if lower in CONFIRM_WORDS:
             return _route("strategy_confirmation", False, False, action="confirm_strategy", confidence=1.0, reason="explicit confirmation")
+        if lower in AMBIGUOUS_APPROVAL_WORDS:
+            return _route("strategy_discussion", False, False, confidence=1.0, reason="ambiguous approval does not confirm")
         if any(pattern in lower for pattern in ("取消", "cancel")):
             return _route("cancel_session", False, False, action="cancel_session", confidence=1.0, reason="cancel request")
         if any(pattern in lower for pattern in ("重新开始", "重开", "restart")):
             return _route("restart_session", False, False, action="restart_session", confidence=1.0, reason="restart request")
-        if any(pattern in lower for pattern in EXECUTION_PATTERNS):
+        if any(pattern in lower for pattern in EXECUTION_PATTERNS) and not any(marker in lower for marker in ("不要", "不能", "别", "not", "do not", "don't")):
             return _route("execution_confirmation", False, False, action="confirm_execution", confidence=0.95, reason="execution request")
         if any(pattern in lower for pattern in ("检查通道", "通道检查", "检测通道", "channel check")):
             return _route("channel_check_request", False, False, action="check_channels", confidence=0.9, reason="channel check request")
@@ -205,7 +217,7 @@ def _math_question(text: str) -> bool:
 
 
 def _strategy_discussion(text: str) -> bool:
-    markers = ("够不够", "难不难", "会不会", "合理吗", "怎么看", "建议", "为什么", "效果", "太少", "太多")
+    markers = ("够不够", "难不难", "会不会", "合理吗", "怎么看", "建议", "为什么", "效果", "太少", "太多", "如何提高", "多少", "difficult", "accuracy")
     return any(marker in text for marker in markers) and any(marker in text for marker in SEARCH_MARKERS)
 
 
