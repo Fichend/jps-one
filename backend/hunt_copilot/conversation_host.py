@@ -71,6 +71,8 @@ class ConversationHost:
     @staticmethod
     def _strategy_discussion(message: str, session: CopilotSession) -> str:
         lower = message.lower()
+        if lower.strip() in {"可以", "好的", "好", "没问题", "就这样", "行", "ok", "okay", "yes", "确认", "确认策略", "同意确认"}:
+            return "收到，但这类简短回复不会确认或修改策略。请点击右侧“确认策略”，或明确输入“确认当前策略”。"
         if "instagram" in lower or "ins" in lower:
             return "Instagram 作为硬条件会提高可触达性，但也会减少合格客户数量。更稳的做法是把候选池设为最终客户数的 4-5 倍，缺 Instagram 的客户保留在候补排序里。"
         if "预算" in message or "budget" in lower:

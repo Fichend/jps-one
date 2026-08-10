@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from hunt_copilot.requirement_parser import sanitize_planner_patch
 from hunt_copilot.schemas import HuntStrategy
 from product_knowledge import JpsProductRecommender
 
@@ -16,34 +17,31 @@ class StrategyPatchMerger:
         self.recommender = JpsProductRecommender()
 
     def merge(self, strategy: HuntStrategy, patch: dict[str, Any], *, raw_message: str = "") -> HuntStrategy:
+        patch = sanitize_planner_patch(raw_message, patch)
         merged = strategy.model_copy(deep=True)
-        changed = False
         for field in LIST_FIELDS:
             if field in patch and patch[field] is not None:
                 if field == "product_keywords" and _exclusive_keyword_message(raw_message):
                     setattr(merged, field, _incoming_list(patch[field]))
                 else:
                     setattr(merged, field, _merge_list(getattr(merged, field), patch[field]))
-                changed = True
         if "hard_filters" in patch and isinstance(patch["hard_filters"], dict):
             for key, value in patch["hard_filters"].items():
                 if hasattr(merged.hard_filters, key) and value is not None:
                     setattr(merged.hard_filters, key, bool(value))
-                    changed = True
         if "budget" in patch and isinstance(patch["budget"], dict):
             for key, value in patch["budget"].items():
                 if hasattr(merged.budget, key) and value not in (None, ""):
                     setattr(merged.budget, key, value)
-                    changed = True
         if "rules" in patch and isinstance(patch["rules"], dict):
             for key, value in patch["rules"].items():
                 if hasattr(merged.rules, key) and value is not None:
                     setattr(merged.rules, key, value)
-                    changed = True
         if raw_message.strip():
             merged.raw_requirement = (merged.raw_requirement + "\n" + raw_message.strip()).strip()
         self._normalize_with_product_knowledge(merged, raw_message)
         self._sync_required_fields(merged)
+        changed = _authoritative_strategy(merged) != _authoritative_strategy(strategy)
         if changed:
             merged.strategy_version += 1
             merged.strategy_confirmed = False
@@ -63,8 +61,8 @@ class StrategyPatchMerger:
             strategy.customer_types = recommendation.normalized_customer_types
         if recommendation.normalized_exclusions:
             strategy.exclusions = recommendation.normalized_exclusions
-        if not strategy.product_keywords and recommendation.recommended_keywords:
-            strategy.product_keywords = recommendation.recommended_keywords
+        # Catalogue results are recommendations only. They must never silently
+        # become authoritative user keywords.
         strategy.product_knowledge_refs = recommendation.matched_families
         strategy.product_knowledge_notes = recommendation.reasons
         strategy.product_knowledge_summary = _product_summary(recommendation.recommended_keywords, recommendation.matched_families, recommendation.reasons)
@@ -126,3 +124,18 @@ def _product_summary(keywords: list[str], families: list[str], reasons: list[str
     if reasons:
         parts.append(reasons[0])
     return "；".join(parts)
+
+
+def _authoritative_strategy(strategy: HuntStrategy) -> dict[str, Any]:
+    return {
+        "target_regions": strategy.target_regions,
+        "customer_types": strategy.customer_types,
+        "product_keywords": strategy.product_keywords,
+        "exclusions": strategy.exclusions,
+        "hard_filters": strategy.hard_filters.model_dump(),
+        "required_fields": strategy.required_fields,
+        "preferred_fields": strategy.preferred_fields,
+        "confirmed_fields": strategy.confirmed_fields,
+        "budget": strategy.budget.model_dump(),
+        "rules": strategy.rules.model_dump(),
+    }

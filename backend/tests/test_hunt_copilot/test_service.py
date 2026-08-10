@@ -103,7 +103,8 @@ def test_copilot_selects_medical_consumables_skill(tmp_path):
 def test_copilot_replaces_keywords_when_user_says_only(tmp_path):
     service = HuntCopilotService(store=HuntCopilotStore(str(tmp_path / "sessions.json")), settings=_settings(tmp_path))
     session, _ = service.start("泰国牙科学校和牙科设备经销商，排除普通牙科诊所，必须有 Instagram 邮箱 电话")
-    assert "dental simulator" in session.strategy.product_keywords
+    assert session.strategy.product_keywords == []
+    assert "dental simulator" in session.strategy.product_knowledge_summary
 
     session, assistant = service.send(session.session_id, "只要 dental simulator")
 

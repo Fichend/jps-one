@@ -261,6 +261,7 @@ class CopilotSession(BaseModel):
     last_ai_action: str = ""
     clarification_focus: str = ""
     recent_strategy_changes: list[str] = Field(default_factory=list)
+    strategy_snapshots: list[dict[str, Any]] = Field(default_factory=list)
     created_at: str
     updated_at: str
 

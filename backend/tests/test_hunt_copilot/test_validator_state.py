@@ -36,7 +36,8 @@ def test_patch_merger_normalizes_jps_targets_and_required_fields():
     assert "general dental clinic" in strategy.exclusions
     assert "general dental clinic" not in strategy.customer_types
     assert strategy.required_fields == ["Instagram", "邮箱", "电话"]
-    assert "dental simulator" in strategy.product_keywords
+    assert strategy.product_keywords == []
+    assert "dental simulator" in strategy.product_knowledge_summary
 
 
 def test_allowed_actions_require_strategy_confirmation(tmp_path):

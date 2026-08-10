@@ -34,8 +34,7 @@ def test_planner_uses_jps_catalog_keywords_and_excludes_clinic_targets():
     assert "dental equipment distributor" in strategy.customer_types
     assert "general dental clinic" in strategy.exclusions
     assert "general dental clinic" not in strategy.customer_types
-    assert "dental simulator" in strategy.product_keywords
-    assert "dental teaching equipment" in strategy.product_keywords
+    assert strategy.product_keywords == []
     assert strategy.hard_filters.require_instagram is True
     assert strategy.hard_filters.require_email is True
     assert strategy.hard_filters.require_phone is True
