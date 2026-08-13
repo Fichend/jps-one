@@ -12,6 +12,18 @@ DENTAL_MARKERS = (
     "牙科", "口腔", "nha khoa", "răng", "ทันต", "ทันตกรรม", "gigi", "pergigi",
 )
 
+MEDICAL_MARKERS = (
+    "medical", "medical consumables", "medical supplies", "hospital supplies", "healthcare",
+    "hospital", "surgical", "sterilization", "sterilisation", "cssd", "central sterile", "cme",
+    "医疗", "医用", "医院", "耗材", "手术", "灭菌", "消毒", "消毒供应中心",
+)
+
+CSSD_MARKERS = (
+    "cssd", "cme", "central sterile", "central sterile supply", "sterilization", "sterilisation",
+    "chemical indicator", "biological indicator", "indicator tape", "sterilization reel",
+    "消毒供应中心", "灭菌", "灭菌耗材", "化学指示", "生物指示", "灭菌卷", "灭菌包装",
+)
+
 SCHOOL_MARKERS = (
     "faculty of dentistry", "school of dentistry", "dental school", "dental college",
     "college of dentistry", "university", "faculty", "academy", "department of dentistry",
@@ -57,3 +69,5 @@ MEDIA_MARKERS = (
 
 REQUEST_SCHOOL_MARKERS = SCHOOL_MARKERS + TRAINING_MARKERS + ("school", "college", "training", "教育", "学校", "培训", "院校")
 REQUEST_DISTRIBUTOR_MARKERS = DISTRIBUTOR_MARKERS + ("distribution", "channel partner", "渠道", "经销商", "代理商")
+REQUEST_MEDICAL_MARKERS = MEDICAL_MARKERS + ("medical consumables distributor", "medical consumables importer", "hospital supplies distributor", "cssd supplier")
+REQUEST_DENTAL_MARKERS = DENTAL_MARKERS + ("dental equipment distributor", "dental consumables distributor", "dental supplies importer")

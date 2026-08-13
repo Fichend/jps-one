@@ -16,6 +16,8 @@ class HuntState(TypedDict):
     # ── User input ──────────────────────────────────────────────────────
     website_url: str
     product_keywords: list[str]
+    product_department: str
+    product_category: str
     target_customer_profile: str           # e.g. '批发商和代理商', 'distributors'
     description: str                       # free-form natural language description of hunt goal
     target_regions: list[str]

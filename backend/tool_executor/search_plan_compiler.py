@@ -10,6 +10,16 @@ from __future__ import annotations
 
 from hunt_copilot.schemas import HuntStrategy, ToolPlan, ToolPlanStep
 from hunt_copilot.strategy_fingerprint import strategy_fingerprint
+from product_knowledge.taxonomy import (
+    CSSD_STERILIZATION,
+    DENTAL,
+    DENTAL_CONSUMABLES,
+    DENTAL_EQUIPMENT,
+    DENTAL_TEACHING_LAB,
+    MEDICAL_CONSUMABLES,
+    MEDICAL_PPE_CONSUMABLES,
+    SURGICAL_PACKS,
+)
 from search_tools.locale_keyword_expander import LocaleKeywordExpander
 
 
@@ -105,7 +115,16 @@ class SearchPlanCompiler:
         customers = sorted(strategy.customer_types or [""])
         products = sorted(strategy.product_keywords or [""])
         queries: list[str] = []
-        queries.extend(_target_type_templates(regions, customers, products))
+        queries.extend(
+            _target_type_templates(
+                regions,
+                customers,
+                products,
+                department=strategy.product_department,
+                category=strategy.product_category,
+                scenarios=strategy.application_scenarios,
+            )
+        )
         for region in regions[:2]:
             for customer in customers[:2]:
                 for product in products[:2]:
@@ -169,12 +188,93 @@ def _clean_discovery_query(query: str) -> str:
     return " ".join(parts).strip() or str(query or "").strip()
 
 
-def _target_type_templates(regions: list[str], customers: list[str], products: list[str]) -> list[str]:
+def _target_type_templates(
+    regions: list[str],
+    customers: list[str],
+    products: list[str],
+    *,
+    department: str = "unclear",
+    category: str = "unclear",
+    scenarios: list[str] | None = None,
+) -> list[str]:
     region = regions[0] if regions else ""
     product = products[0] if products else ""
-    text = " ".join([*customers, *products]).lower()
+    text = " ".join([*customers, *products, *(scenarios or [])]).lower()
     dental_context = any(marker in text for marker in ("dental", "dentist", "odont", "牙科", "口腔", "phantom"))
     queries: list[str] = []
+
+    if department == MEDICAL_CONSUMABLES:
+        if category == CSSD_STERILIZATION:
+            templates = (
+                (region, "medical consumables distributor", product),
+                (region, "medical consumables importer", product),
+                (region, "CSSD supplier", product),
+                (region, "hospital sterilization products distributor", product or "sterilization products"),
+                (region, "central sterile supply department supplier", product or "sterilization supplies"),
+            )
+        elif category == SURGICAL_PACKS:
+            templates = (
+                (region, "medical consumables distributor", product),
+                (region, "hospital supplies distributor", product),
+                (region, "medical supplies wholesaler", product or "surgical packs"),
+            )
+        elif category == MEDICAL_PPE_CONSUMABLES:
+            templates = (
+                (region, "medical consumables distributor", product),
+                (region, "medical consumables importer", product),
+                (region, "hospital PPE supplies distributor", product),
+                (region, "medical supplies wholesaler", product),
+            )
+        else:
+            templates = (
+                (region, "medical consumables distributor", product),
+                (region, "medical consumables importer", product),
+                (region, "hospital supplies distributor", product),
+                (region, "medical supplies wholesaler", product),
+            )
+        queries.extend(_join_query(parts) for parts in templates)
+        return _dedupe_queries(queries)[:6]
+
+    if department == DENTAL:
+        if category == DENTAL_TEACHING_LAB or any(marker in text for marker in ("school", "university", "faculty", "college", "training", "学校", "大学", "学院", "培训")):
+            queries.extend(
+                _join_query(parts)
+                for parts in (
+                    (region, "dental simulation training center"),
+                    (region, "faculty of dentistry", product),
+                    (region, "dental school phantom head lab"),
+                    (region, "preclinical dental lab", product),
+                )
+            )
+            if _is_thailand(region):
+                queries.extend([
+                    _join_query(("คณะทันตแพทยศาสตร์", product)),
+                    _join_query(("ศูนย์ฝึกอบรมทันตกรรม", product or "phantom head")),
+                ])
+        if category == DENTAL_CONSUMABLES:
+            queries.extend(
+                _join_query(parts)
+                for parts in (
+                    (region, "dental consumables distributor", product),
+                    (region, "dental supplies importer", product),
+                    (region, "dental disposable supplier", product),
+                    (region, "dental burs supplier", product),
+                )
+            )
+        elif category == DENTAL_EQUIPMENT or any(marker in text for marker in ("distributor", "dealer", "supplier", "importer", "wholesale", "agent", "经销", "代理", "进口", "批发")):
+            queries.extend(
+                _join_query(parts)
+                for parts in (
+                    (region, "dental equipment distributor", product),
+                    (region, "dental supplies importer", product),
+                    (region, "authorized dental dealer", product),
+                    (region, "dental equipment wholesaler"),
+                )
+            )
+            if _is_thailand(region):
+                queries.append(_join_query(("ตัวแทนจำหน่าย อุปกรณ์ทันตกรรม", product)))
+        return _dedupe_queries(queries)[:6]
+
     if any(marker in text for marker in ("school", "university", "faculty", "college", "training", "学校", "大学", "学院", "培训")):
         queries.extend(
             _join_query(parts)
@@ -199,11 +299,15 @@ def _target_type_templates(regions: list[str], customers: list[str], products: l
         queries.extend(_join_query(parts) for parts in templates)
         if _is_thailand(region):
             queries.append(_join_query(("ตัวแทนจำหน่าย อุปกรณ์ทันตกรรม", product)))
+    return _dedupe_queries(queries)[:6]
+
+
+def _dedupe_queries(queries: list[str]) -> list[str]:
     deduped: list[str] = []
     for query in queries:
         if query and query not in deduped:
             deduped.append(query)
-    return deduped[:6]
+    return deduped
 
 
 def _join_query(parts: tuple[str, ...]) -> str:

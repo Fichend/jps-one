@@ -51,6 +51,19 @@
         "牙科器械供应商"
       ]
     },
+    "dental_consumables_distributor": {
+      "canonical_en": "dental consumables distributor",
+      "aliases": [
+        "dental consumables distributor",
+        "dental supplies importer",
+        "dental disposable distributor",
+        "dental burs supplier",
+        "牙科耗材经销商",
+        "牙科耗材进口商",
+        "牙科用品进口商",
+        "牙科一次性用品经销商"
+      ]
+    },
     "general_dental_clinic": {
       "canonical_en": "general dental clinic",
       "aliases": [
@@ -74,6 +87,31 @@
         "医用耗材经销商",
         "医疗用品经销商",
         "医疗耗材进口商"
+      ]
+    },
+    "medical_consumables_importer": {
+      "canonical_en": "medical consumables importer",
+      "aliases": [
+        "medical consumables importer",
+        "medical disposables importer",
+        "medical supplies importer",
+        "医疗耗材进口商",
+        "医用耗材进口商",
+        "医院耗材进口商"
+      ]
+    },
+    "cssd_supplier": {
+      "canonical_en": "CSSD supplier",
+      "aliases": [
+        "CSSD supplier",
+        "sterilization products distributor",
+        "sterilization consumables supplier",
+        "hospital CSSD supplier",
+        "CSSD供应商",
+        "CSSD 供应商",
+        "灭菌产品经销商",
+        "灭菌耗材经销商",
+        "消毒供应中心耗材供应商"
       ]
     },
     "hospital_supplies_distributor": {
@@ -210,6 +248,7 @@
       ],
       "best_customer_types": [
         "dental_equipment_distributor",
+        "dental_consumables_distributor",
         "medical_consumables_distributor",
         "hospital_supplies_distributor"
       ],
@@ -242,6 +281,7 @@
       ],
       "best_customer_types": [
         "medical_consumables_distributor",
+        "medical_consumables_importer",
         "hospital_supplies_distributor",
         "medical_wholesaler",
         "hospital"
@@ -273,9 +313,11 @@
       ],
       "best_customer_types": [
         "medical_consumables_distributor",
+        "medical_consumables_importer",
         "hospital_supplies_distributor",
         "medical_wholesaler",
         "hospital",
+        "cssd_supplier",
         "dental_equipment_distributor"
       ],
       "exclude_customer_types": [
@@ -313,6 +355,7 @@
       ],
       "best_customer_types": [
         "medical_consumables_distributor",
+        "medical_consumables_importer",
         "hospital_supplies_distributor",
         "medical_wholesaler",
         "hospital"

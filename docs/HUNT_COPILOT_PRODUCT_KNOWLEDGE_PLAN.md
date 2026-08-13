@@ -72,44 +72,26 @@ The strategy must not add `general dental clinic` to target customers.
 - Product knowledge recommendation does not call Tavily, Serper, Apify, or any paid search tool.
 - Formal Hunt execution still requires backend-controlled strategy confirmation, channel checks, preview, and user confirmation.
 
-## Next Phase
+## Current Phase
 
-Add a MiniMax-backed `HuntCopilotLLMPlanner`.
+The old `HuntCopilotLLMPlanner / planner_prompt / patch_merger / deterministic planner` chain has been removed. Conversation updates now go through `backend/hunt_copilot_ai/`:
 
-Recommended backend files:
-
-- `backend/hunt_copilot/llm_planner.py`
-- `backend/hunt_copilot/planner_prompt.py`
-- `backend/hunt_copilot/patch_merger.py`
-- `backend/hunt_copilot/validator.py`
-- `backend/hunt_copilot/state_machine.py`
-
-MiniMax should return structured JSON:
-
-```json
-{
-  "intent": "modify_budget",
-  "assistant_message": "可以，我把最终客户数调整为 15，候选池调整为 50。",
-  "strategy_patch": {
-    "budget": {
-      "final_leads": 15,
-      "max_candidates": 50
-    }
-  },
-  "detected_conflicts": [],
-  "missing_fields": [],
-  "ready_for_strategy_card": true,
-  "suggested_action": "show_strategy_card"
-}
+```text
+ConversationRouter
+  -> SemanticExtractor
+  -> SemanticGuardrails
+  -> StrategyComposer
+  -> SemanticResponseComposer
+  -> StrategyValidator / StateMachine
 ```
 
-The backend must treat `suggested_action` as advisory only. Backend state and allowed actions remain authoritative.
+The backend still treats model output as advisory. Validation, state, channel checks, budget gates, and execution remain authoritative.
 
 ## Acceptance Tests
 
 1. Chinese target/exclusion mapping works.
 2. Excluded clinics are not added to target customers.
-3. Missing product keywords are filled from the JPS catalogue template.
+3. Missing product keywords are recommended from the JPS catalogue template, but not silently written into authoritative strategy fields.
 4. Explicit user product keywords are preserved.
 5. Hunt Copilot still passes session and execution tests.
 6. Frontend build succeeds.

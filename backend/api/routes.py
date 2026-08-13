@@ -106,6 +106,8 @@ class HuntRequest(BaseModel):
     website_url: str = ""
     description: str = Field(default="", description="Free-form description, e.g. '我想找东南亚的旅行社'")
     product_keywords: list[str] = Field(default_factory=list)
+    product_department: str = ""
+    product_category: str = ""
     target_customer_profile: str = Field(default="", description="Target customer type, e.g. '批发商和代理商', 'distributors and wholesalers'")
     target_regions: list[str] = Field(default_factory=list)
     uploaded_file_ids: list[str] = Field(default_factory=list, description="File paths returned by /upload endpoint")
@@ -702,6 +704,8 @@ async def _run_hunt(hunt_id: str, request: HuntRequest) -> None:
         "website_url": request.website_url,
         "description": request.description,
         "product_keywords": request.product_keywords,
+        "product_department": request.product_department,
+        "product_category": request.product_category,
         "target_customer_profile": request.target_customer_profile,
         "target_regions": request.target_regions,
         "uploaded_files": list(request.uploaded_file_ids),
@@ -1234,6 +1238,8 @@ def _initialize_hunt(request: HuntRequest) -> tuple[str, HuntRequest]:
         "created_at": now_iso(),
         "website_url": request.website_url,
         "product_keywords": request.product_keywords,
+        "product_department": request.product_department,
+        "product_category": request.product_category,
         "target_customer_profile": request.target_customer_profile,
         "target_regions": request.target_regions,
         "target_lead_count": request.target_lead_count,

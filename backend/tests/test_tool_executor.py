@@ -42,6 +42,27 @@ def test_tool_plan_uses_target_type_templates_for_dental_school_thailand():
     assert "คณะทันตแพทยศาสตร์ dental simulator" in joined
 
 
+def test_tool_plan_uses_medical_cssd_templates_without_dental_leakage():
+    strategy = HuntStrategy(
+        target_regions=["Brazil"],
+        customer_types=["medical consumables distributor", "medical consumables importer", "CSSD supplier"],
+        product_keywords=["sterilization indicator tape", "chemical indicator"],
+        product_department="medical_consumables",
+        product_category="cssd_sterilization",
+        application_scenarios=["CSSD"],
+    )
+
+    queries = [step.query for step in build_tool_plan(strategy).steps if step.execution_mode == "search_phase"]
+    joined = "\n".join(queries).lower()
+
+    assert "brazil medical consumables distributor" in joined
+    assert "brazil medical consumables importer" in joined
+    assert "brazil cssd supplier" in joined
+    assert "hospital sterilization products distributor" in joined
+    assert "dental equipment distributor" not in joined
+    assert "dental simulation" not in joined
+
+
 def test_tool_plan_is_stable_for_reordered_strategy_terms():
     first = HuntStrategy(
         target_regions=["Vietnam"],

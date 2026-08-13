@@ -262,7 +262,7 @@ class LocaleKeywordExpander:
         if any(token in text for token in ("school", "college", "university", "training", "学校", "大学", "学院")):
             selected.extend(profile.customer_terms.get("school", ()))
         if any(token in text for token in ("distributor", "dealer", "supplier", "wholesale", "经销", "代理", "供应")):
-            if any(token in text for token in ("steriliz", "infection control", "灭菌", "消毒", "cme")):
+            if any(token in text for token in ("steriliz", "infection control", "灭菌", "消毒", "cssd", "cme")):
                 selected.extend(profile.customer_terms.get("sterilization_supplier", ()))
             elif any(token in text for token in ("medical", "hospital", "医疗", "医院")):
                 selected.extend(profile.customer_terms.get("medical_distributor", ()))

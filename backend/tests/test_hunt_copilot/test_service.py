@@ -52,7 +52,7 @@ def test_copilot_collects_then_checks_channels(tmp_path):
 
 def test_execute_enqueues_automation_job(tmp_path):
     service = HuntCopilotService(store=HuntCopilotStore(str(tmp_path / "sessions.json")), settings=_settings(tmp_path))
-    session, _ = service.start("Vietnam dental distributor Instagram email phone top 5 candidate 20")
+    session, _ = service.start("Vietnam dental distributor dental simulator Instagram email phone top 5 candidate 20")
     session, _ = service.update_strategy(session.session_id, session.strategy)
     session, _ = service.confirm_strategy(session.session_id)
     session, _ = service.check_channels(session.session_id)

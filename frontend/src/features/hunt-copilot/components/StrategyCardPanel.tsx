@@ -23,6 +23,23 @@ const stateLabels: Record<string, string> = {
   CANCELLED: "已取消",
 };
 
+const departmentLabels: Record<string, string> = {
+  dental: "牙科",
+  medical_consumables: "医疗耗材",
+  unclear: "待确认",
+};
+
+const categoryLabels: Record<string, string> = {
+  dental_teaching_lab: "牙科教学实验室产品",
+  dental_equipment: "牙科设备",
+  dental_consumables: "牙科耗材",
+  medical_ppe_consumables: "医疗防护/PPE耗材",
+  surgical_packs: "手术包",
+  cssd_sterilization: "CSSD/灭菌耗材",
+  general_hospital_consumables: "医院通用耗材",
+  unclear: "待确认",
+};
+
 export function StrategyCardPanel({
   session,
   strategy,
@@ -94,8 +111,13 @@ export function StrategyCardPanel({
             <StrategyStep icon={<MapPinned className="h-4 w-4" />} index={1} title="目标" complete={hasTarget} active={!hasTarget}>
               <SummaryRow label="地区" values={strategy.target_regions} />
               <SummaryRow label="客户" values={strategy.customer_types} />
+              <SummaryRow label="业务部门" values={[formatDepartment(strategy.product_department)]} muted={(strategy.product_department || "unclear") === "unclear"} />
+              <SummaryRow label="产品分类" values={[formatCategory(strategy.product_category)]} muted={(strategy.product_category || "unclear") === "unclear"} />
               <SummaryRow label="JPS 产品" values={strategy.product_keywords} />
+              <SummaryRow label="应用场景" values={strategy.application_scenarios ?? []} empty="无" muted />
+              <SummaryRow label="业务说明" values={strategy.business_notes ?? []} empty="无" muted />
               <SummaryRow label="排除" values={strategy.exclusions} empty="无" muted />
+              <FieldConfidence strategy={strategy} />
               {strategy.product_knowledge_summary ? (
                 <div className="rounded-md bg-muted/40 p-3 text-xs leading-5">
                   <p className="font-medium text-foreground">产品目录推荐</p>
@@ -171,6 +193,12 @@ export function StrategyCardPanel({
               </div>
             ) : null}
 
+            {strategy.uncertain_fields?.length ? (
+              <div className="rounded-md border border-sky-200 bg-sky-50 p-3 text-xs leading-5 text-sky-950">
+                AI 还不确定：{strategy.uncertain_fields.join("、")}。这些字段不会强行写入搜索条件，需要你继续确认。
+              </div>
+            ) : null}
+
             {session?.recent_strategy_changes?.length ? (
               <div className="space-y-1 rounded-md border bg-emerald-50 p-3 text-xs text-emerald-900">
                 <p className="font-medium">最近更新</p>
@@ -230,6 +258,26 @@ function SummaryRow({ label, values, empty = "待确认", muted = false }: { lab
     <div className="grid grid-cols-[72px_minmax(0,1fr)] gap-2 text-xs leading-6">
       <span className="text-muted-foreground">{label}</span>
       <span className={cn("min-w-0 break-words", muted ? "text-muted-foreground" : "text-foreground")}>{values.length ? values.join("、") : empty}</span>
+    </div>
+  );
+}
+
+function FieldConfidence({ strategy }: { strategy: HuntCopilotStrategy }) {
+  const confidence = strategy.field_confidence ?? {};
+  const entries = [
+    ["target_regions", "地区"],
+    ["customer_types", "客户"],
+    ["product_keywords", "产品"],
+    ["application_scenarios", "场景"],
+  ].filter(([key]) => typeof confidence[key] === "number" && confidence[key] > 0);
+  if (!entries.length) return null;
+  return (
+    <div className="flex flex-wrap gap-1.5 pt-1">
+      {entries.map(([key, label]) => (
+        <span key={key} className="rounded-full bg-muted px-2 py-1 text-[11px] text-muted-foreground">
+          {label}置信 {Math.round(Number(confidence[key]) * 100)}%
+        </span>
+      ))}
     </div>
   );
 }
@@ -294,4 +342,12 @@ function normalizeBudgetValue(value: number, min: number, step: number) {
 function formatBudgetValue(value: number, step: number) {
   if (step >= 1) return String(Math.round(Number(value || 0)));
   return String(Number(value || 0));
+}
+
+function formatDepartment(value?: string) {
+  return departmentLabels[value || "unclear"] || value || "待确认";
+}
+
+function formatCategory(value?: string) {
+  return categoryLabels[value || "unclear"] || value || "待确认";
 }

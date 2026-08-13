@@ -55,6 +55,10 @@ class StrategyValidator:
         if bad_product_keywords:
             conflicts.append("国家名称不能作为产品关键词：" + "、".join(bad_product_keywords))
             blocking.append("请填写真实产品或产品应用关键词。")
+        polluted_product_keywords = [item for item in strategy.product_keywords if _looks_like_non_product_keyword(item)]
+        if polluted_product_keywords:
+            conflicts.append("产品关键词疑似混入业务描述：" + "、".join(polluted_product_keywords))
+            blocking.append("请把业务描述移到应用场景或业务说明，产品关键词只保留产品/品类。")
         if strategy.budget.final_leads > strategy.budget.max_candidates:
             blocking.append("最终客户数不能大于候选池数量。")
         if strategy.budget.preview_total_usd > strategy.budget.total_usd:
@@ -90,3 +94,10 @@ class StrategyValidator:
 def _country_key(value: str) -> str:
     clean = str(value or "").strip().casefold()
     return COUNTRY_ALIASES.get(clean, str(value or "").strip())
+
+
+def _looks_like_non_product_keyword(value: str) -> bool:
+    text = str(value or "").strip().casefold()
+    if len(text) > 55:
+        return True
+    return any(marker in text for marker in ("潜在客户", "目标客户", "客户是", "例如", "比如", "面向", "应用场景", "target customer", "potential customer"))

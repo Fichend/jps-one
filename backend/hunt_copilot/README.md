@@ -1,33 +1,35 @@
-# Hunt Copilot AI Planner
+# Hunt Copilot Runtime
 
-Hunt Copilot is split into two layers:
+Hunt Copilot now uses a semantic AI layer for conversation and keeps this package focused on state, validation, execution gates, and audit rendering.
 
-1. **AI planner**: understands the salesperson's natural-language request and returns only an intent plus a partial `strategy_patch`.
-2. **Backend executor**: owns validation, state transitions, channel checks, preview, budgets, and final Hunt job creation.
+## Active Flow
 
-The LLM is never allowed to start a paid search directly. It can only suggest updates to the strategy card.
+```text
+ConversationRouter
+  -> hunt_copilot_ai.CopilotAIOrchestrator
+  -> StrategyValidator
+  -> state_machine.allowed_actions
+  -> Tool Plan / HuntJobQueue
+```
+
+The removed old chain was `llm_planner -> planner_prompt -> patch_merger -> deterministic planner`. New strategy updates must go through `backend/hunt_copilot_ai/` so there is only one authoritative conversational path.
 
 ## Modules
 
-- `planner_prompt.py`: JSON-only MiniMax/LLM planner contract.
-- `llm_planner.py`: calls `LLMTool` when configured, and falls back to deterministic parsing when LLM is unavailable.
-- `patch_merger.py`: merges partial patches into `HuntStrategy`, keeps existing fields, maps Chinese/English customer and JPS product terms, and removes excluded targets.
-- `validator.py`: enforces missing-field, budget, exclusion, social-channel, and execution-gate checks.
-- `state_machine.py`: computes user-visible `state` and `allowed_actions`.
-- `planner.py`: deterministic fallback parser and strategy-card renderer.
-
-## Required Configuration
-
-- `HUNT_COPILOT_LLM_ENABLED=true`
-- `HUNT_COPILOT_MODEL=openai/MiniMax-Text-01` optional; empty means use `LLM_MODEL`.
-- `MINIMAX_API_KEY=...` or another supported LLM provider key.
-- Search execution still depends on Tavily/Apify/Serper/Jina keys configured in the settings center.
+- `conversation_router.py`: keeps small talk, questions, commands, confirmations, and strategy updates separated.
+- `conversation_host.py`: replies to non-mutating chat without touching the strategy card.
+- `service.py`: owns session persistence, state transitions, channel checks, preview, and final Hunt job creation.
+- `strategy_commands.py`: handles explicit deterministic commands such as replacing product keywords, clearing fields, and undo.
+- `strategy_renderer.py`: renders the current strategy into execution payload/audit text.
+- `validator.py`: enforces missing-field, budget, exclusion, channel, and execution-gate checks.
+- `state_machine.py`: computes user-visible state and allowed actions.
 
 ## Safety Rules
 
+- AI can update only the strategy object; it cannot run paid search tools directly.
 - Strategy confirmation is required before channel checks.
 - Channel checks and preview are required before formal execution.
 - One Copilot session can create only one Hunt job.
 - Missing product keywords block strategy confirmation.
 - Excluded customer types are removed from target customers.
-- Required social/contact fields are hard filters; preferred fields are only ranking signals.
+- Contact and social fields are enrichment/scoring goals unless a downstream validator explicitly blocks them.
