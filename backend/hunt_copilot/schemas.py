@@ -88,6 +88,19 @@ class HuntStrategy(BaseModel):
     target_regions: list[str] = Field(default_factory=list)
     customer_types: list[str] = Field(default_factory=list)
     product_keywords: list[str] = Field(default_factory=list)
+    product_department: Literal["dental", "medical_consumables", "unclear"] = "unclear"
+    product_category: Literal[
+        "dental_teaching_lab",
+        "dental_equipment",
+        "dental_consumables",
+        "medical_ppe_consumables",
+        "surgical_packs",
+        "cssd_sterilization",
+        "general_hospital_consumables",
+        "unclear",
+    ] = "unclear"
+    application_scenarios: list[str] = Field(default_factory=list)
+    business_notes: list[str] = Field(default_factory=list)
     exclusions: list[str] = Field(default_factory=list)
     hard_filters: HardFilters = Field(default_factory=HardFilters)
     budget: SearchBudget = Field(default_factory=SearchBudget)
@@ -103,12 +116,18 @@ class HuntStrategy(BaseModel):
     product_knowledge_refs: list[str] = Field(default_factory=list)
     product_knowledge_notes: list[str] = Field(default_factory=list)
     product_knowledge_summary: str = ""
+    field_sources: dict[str, list[str]] = Field(default_factory=dict)
+    field_confidence: dict[str, float] = Field(default_factory=dict)
+    uncertain_fields: list[str] = Field(default_factory=list)
+    last_extraction: dict[str, Any] = Field(default_factory=dict)
 
     @model_validator(mode="after")
     def normalize_strategy(self) -> "HuntStrategy":
         self.target_regions = _dedupe(self.target_regions)
         self.customer_types = _dedupe(self.customer_types)
         self.product_keywords = _dedupe(self.product_keywords)
+        self.application_scenarios = _dedupe(self.application_scenarios)
+        self.business_notes = _dedupe(self.business_notes)
         self.exclusions = _dedupe(self.exclusions)
         self.search_sources = ["web", "google_maps", "instagram", "facebook"]
         self.required_fields = _dedupe(self.required_fields or self.hard_filters.enabled_labels())
@@ -116,17 +135,8 @@ class HuntStrategy(BaseModel):
         self.confirmed_fields = _dedupe(self.confirmed_fields)
         self.product_knowledge_refs = _dedupe(self.product_knowledge_refs)
         self.product_knowledge_notes = _dedupe(self.product_knowledge_notes)
+        self.uncertain_fields = _dedupe(self.uncertain_fields)
         return self
-
-
-class PlannerResponse(BaseModel):
-    intent: str = "provide_requirement"
-    assistant_message: str = ""
-    strategy_patch: dict[str, Any] = Field(default_factory=dict)
-    detected_conflicts: list[str] = Field(default_factory=list)
-    missing_fields: list[str] = Field(default_factory=list)
-    ready_for_strategy_card: bool = False
-    suggested_action: str = "continue_collecting"
 
 
 class ConversationRoute(BaseModel):

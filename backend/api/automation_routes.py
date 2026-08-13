@@ -25,6 +25,8 @@ class AutomationJobRequest(BaseModel):
     website_url: str = ""
     description: str = ""
     product_keywords: list[str] = Field(default_factory=list)
+    product_department: str = ""
+    product_category: str = ""
     target_customer_profile: str = ""
     target_regions: list[str] = Field(default_factory=list)
     uploaded_file_ids: list[str] = Field(default_factory=list)
@@ -191,6 +193,8 @@ def _serialize_job(job: dict[str, Any]) -> dict[str, Any]:
         "website_url": str(payload.get("website_url", "") or ""),
         "description": str(payload.get("description", "") or ""),
         "product_keywords": list(payload.get("product_keywords", []) or []),
+        "product_department": str(payload.get("product_department", "") or ""),
+        "product_category": str(payload.get("product_category", "") or ""),
         "target_regions": list(payload.get("target_regions", []) or []),
         "target_lead_count": int(payload.get("target_lead_count", 0) or 0),
         "search_sources": list(payload.get("search_sources", []) or []),
@@ -264,6 +268,8 @@ async def create_automation_job_from_hunt(hunt_id: str, request: AutomationJobCo
         "website_url": str(payload.get("website_url", "") or ""),
         "description": str(payload.get("description", "") or ""),
         "product_keywords": list(payload.get("product_keywords", []) or []),
+        "product_department": str(payload.get("product_department", "") or ""),
+        "product_category": str(payload.get("product_category", "") or ""),
         "target_customer_profile": str(payload.get("target_customer_profile", "") or ""),
         "target_regions": list(payload.get("target_regions", []) or []),
         "uploaded_file_ids": list(payload.get("uploaded_file_ids", []) or []),

@@ -1,9 +1,10 @@
 from pathlib import Path
 
 from config.settings import Settings
-from hunt_copilot.patch_merger import StrategyPatchMerger
 from hunt_copilot.schemas import HuntStrategy
+from hunt_copilot.service import HuntCopilotService
 from hunt_copilot.state_machine import allowed_actions
+from hunt_copilot.store import HuntCopilotStore
 from hunt_copilot.validator import StrategyValidator
 
 
@@ -20,17 +21,10 @@ def test_validator_blocks_excluded_target_and_missing_keywords(tmp_path):
     assert result.blocking_errors
 
 
-def test_patch_merger_normalizes_jps_targets_and_required_fields():
-    strategy = StrategyPatchMerger().merge(
-        HuntStrategy(),
-        {
-            "target_regions": ["越南"],
-            "customer_types": ["牙科学校", "普通牙科诊所"],
-            "exclusions": ["普通牙科诊所"],
-            "hard_filters": {"require_instagram": True, "require_email": True, "require_phone": True},
-        },
-        raw_message="我需要越南牙科学校，排除普通牙科诊所，必须有 Instagram、邮箱和电话",
-    )
+def test_semantic_copilot_normalizes_jps_targets_and_required_fields(tmp_path):
+    service = HuntCopilotService(store=HuntCopilotStore(str(tmp_path / "sessions.json")), settings=_settings(tmp_path))
+    session, _ = service.start("我需要越南牙科学校，排除普通牙科诊所，必须有 Instagram、邮箱和电话")
+    strategy = session.strategy
 
     assert "dental school" in strategy.customer_types
     assert "general dental clinic" in strategy.exclusions

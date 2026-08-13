@@ -17,6 +17,7 @@ class SearchSkillSelector:
                 strategy.raw_requirement or "",
                 " ".join(strategy.customer_types),
                 " ".join(strategy.product_keywords),
+                " ".join(strategy.application_scenarios),
                 " ".join(strategy.exclusions),
             ]
         ).lower()

@@ -10,6 +10,8 @@ class TargetType(StrEnum):
     DENTAL_SCHOOL = "dental_school"
     DENTAL_TRAINING_CENTER = "dental_training_center"
     DENTAL_DISTRIBUTOR = "dental_distributor"
+    MEDICAL_DISTRIBUTOR = "medical_consumables_distributor"
+    CSSD_SUPPLIER = "cssd_supplier"
     MANUFACTURER = "manufacturer"
     CLINIC = "clinic"
     ASSOCIATION = "association"

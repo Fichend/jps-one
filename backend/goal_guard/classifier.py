@@ -8,12 +8,16 @@ from typing import Any
 from goal_guard.rules import (
     ASSOCIATION_MARKERS,
     CLINIC_MARKERS,
+    CSSD_MARKERS,
     DENTAL_MARKERS,
     DIRECTORY_MARKERS,
     DISTRIBUTOR_MARKERS,
     MANUFACTURER_MARKERS,
+    MEDICAL_MARKERS,
     MEDIA_MARKERS,
+    REQUEST_DENTAL_MARKERS,
     REQUEST_DISTRIBUTOR_MARKERS,
+    REQUEST_MEDICAL_MARKERS,
     REQUEST_SCHOOL_MARKERS,
     SCHOOL_MARKERS,
     TRAINING_MARKERS,
@@ -35,8 +39,8 @@ def classify_candidate(candidate: dict[str, Any], context: TargetTypeContext) ->
 
 def assess_candidate(candidate: dict[str, Any], context: TargetTypeContext) -> TargetTypeAssessment:
     text = _candidate_text(candidate)
-    target_type = _detect_type(text)
     requested = _requested_groups(context)
+    target_type = _detect_type(text, requested)
     exclusions = _matched_exclusions(text, context.exclusions)
     flags: list[str] = []
 
@@ -50,6 +54,10 @@ def assess_candidate(candidate: dict[str, Any], context: TargetTypeContext) -> T
         flags.append("clinic_excluded")
     if target_type == TargetType.MANUFACTURER and "distributor" in requested:
         flags.append("manufacturer_when_distributor_requested")
+    if target_type == TargetType.DENTAL_DISTRIBUTOR and "medical" in requested and "dental" not in requested:
+        flags.append("dental_when_medical_requested")
+    if target_type in {TargetType.MEDICAL_DISTRIBUTOR, TargetType.CSSD_SUPPLIER} and "dental" in requested and "medical" not in requested:
+        flags.append("medical_when_dental_requested")
 
     region = assess_region(candidate, context.target_regions)
     flags.extend(str(flag) for flag in region.get("region_flags", []) if str(flag or ""))
@@ -71,8 +79,10 @@ def assess_candidate(candidate: dict[str, Any], context: TargetTypeContext) -> T
     )
 
 
-def _detect_type(text: str) -> TargetType:
+def _detect_type(text: str, requested: set[str]) -> TargetType:
     has_dental = _has_any(text, DENTAL_MARKERS)
+    has_medical = _has_any(text, MEDICAL_MARKERS)
+    has_cssd = _has_any(text, CSSD_MARKERS)
     if _has_any(text, MEDIA_MARKERS):
         return TargetType.MEDIA
     if _has_any(text, DIRECTORY_MARKERS) and not _has_any(text, SCHOOL_MARKERS + DISTRIBUTOR_MARKERS):
@@ -83,6 +93,10 @@ def _detect_type(text: str) -> TargetType:
         return TargetType.DENTAL_SCHOOL
     if _has_any(text, ASSOCIATION_MARKERS) and not _has_any(text, DISTRIBUTOR_MARKERS):
         return TargetType.ASSOCIATION
+    if has_cssd and _has_any(text, DISTRIBUTOR_MARKERS):
+        return TargetType.CSSD_SUPPLIER
+    if has_medical and _has_any(text, DISTRIBUTOR_MARKERS):
+        return TargetType.MEDICAL_DISTRIBUTOR
     if has_dental and _has_any(text, DISTRIBUTOR_MARKERS):
         return TargetType.DENTAL_DISTRIBUTOR
     if _has_any(text, MANUFACTURER_MARKERS):
@@ -90,6 +104,8 @@ def _detect_type(text: str) -> TargetType:
     if has_dental and _has_any(text, CLINIC_MARKERS):
         return TargetType.CLINIC
     if _has_any(text, DISTRIBUTOR_MARKERS):
+        if "medical" in requested or "cssd" in requested:
+            return TargetType.MEDICAL_DISTRIBUTOR
         return TargetType.DENTAL_DISTRIBUTOR
     return TargetType.UNKNOWN
 
@@ -103,6 +119,12 @@ def _requested_groups(context: TargetTypeContext) -> set[str]:
         groups.add("training")
     if _has_any(text, REQUEST_DISTRIBUTOR_MARKERS):
         groups.add("distributor")
+    if _has_any(text, REQUEST_MEDICAL_MARKERS):
+        groups.add("medical")
+    if _has_any(text, CSSD_MARKERS):
+        groups.add("cssd")
+    if _has_any(text, REQUEST_DENTAL_MARKERS):
+        groups.add("dental")
     if _has_any(text, CLINIC_MARKERS):
         groups.add("clinic")
     return groups or {"general_b2b"}
@@ -122,7 +144,15 @@ def _fit_score(target_type: TargetType, requested: set[str], excluded: bool) -> 
     if target_type == TargetType.DENTAL_TRAINING_CENTER:
         return 100 if requested & {"school", "training"} else 60 if "general_b2b" in requested else 40
     if target_type == TargetType.DENTAL_DISTRIBUTOR:
+        if "medical" in requested and "dental" not in requested:
+            return 30
         return 100 if "distributor" in requested else 45 if requested & {"school", "training"} else 60
+    if target_type == TargetType.CSSD_SUPPLIER:
+        return 100 if requested & {"cssd", "medical", "distributor"} else 65
+    if target_type == TargetType.MEDICAL_DISTRIBUTOR:
+        if "dental" in requested and "medical" not in requested:
+            return 30
+        return 100 if requested & {"medical", "cssd", "distributor"} else 60
     if target_type == TargetType.MANUFACTURER:
         return 15 if "distributor" in requested else 35 if requested & {"school", "training"} else 60
     return 60 if "general_b2b" in requested else 20
@@ -131,7 +161,7 @@ def _fit_score(target_type: TargetType, requested: set[str], excluded: bool) -> 
 def _confidence(target_type: TargetType, text: str) -> float:
     if target_type == TargetType.UNKNOWN:
         return 0.25
-    hits = sum(1 for markers in (DENTAL_MARKERS, SCHOOL_MARKERS, TRAINING_MARKERS, DISTRIBUTOR_MARKERS, MANUFACTURER_MARKERS) if _has_any(text, markers))
+    hits = sum(1 for markers in (DENTAL_MARKERS, MEDICAL_MARKERS, CSSD_MARKERS, SCHOOL_MARKERS, TRAINING_MARKERS, DISTRIBUTOR_MARKERS, MANUFACTURER_MARKERS) if _has_any(text, markers))
     return min(0.95, 0.55 + hits * 0.12)
 
 
@@ -141,6 +171,10 @@ def _reason(target_type: TargetType, requested: set[str], score: int, exclusions
         return "命中排除对象：" + "、".join(exclusions)
     if "manufacturer_when_distributor_requested" in flags:
         return "该候选更像制造商/工厂，不符合经销商或代理商优先目标。"
+    if "dental_when_medical_requested" in flags:
+        return "该候选更像牙科渠道，本次目标是医疗耗材/CSSD 渠道，降低推荐优先级。"
+    if "medical_when_dental_requested" in flags:
+        return "该候选更像医疗耗材渠道，本次目标是牙科渠道，降低推荐优先级。"
     if "clinic_excluded" in flags:
         return "该候选更像普通牙科诊所，不符合当前目标客户类型。"
     if target_type in {TargetType.DIRECTORY, TargetType.MEDIA}:

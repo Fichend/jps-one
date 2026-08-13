@@ -89,7 +89,7 @@ def annotate_candidate(candidate: dict[str, Any], *, preferred: list[str] | None
         penalties += 90
     if any(flag in goal_flags for flag in ("directory_not_customer", "media_not_customer")):
         penalties += 70
-    if any(flag in goal_flags for flag in ("manufacturer_when_distributor_requested", "clinic_excluded")):
+    if any(flag in goal_flags for flag in ("manufacturer_when_distributor_requested", "clinic_excluded", "dental_when_medical_requested", "medical_when_dental_requested")):
         penalties += 65
     if "region_mismatch_confirmed" in goal_flags:
         penalties += 180
@@ -115,7 +115,7 @@ def annotate_candidate(candidate: dict[str, Any], *, preferred: list[str] | None
     item["required_match_count"] = item["preferred_match_count"]
     item["required_total_count"] = item["preferred_total_count"]
     item["ranking_reason"] = _ranking_reason(item, preferred=preferred, penalties=penalties)
-    if "matches_exclusion" in goal_flags or any(flag in goal_flags for flag in ("directory_not_customer", "media_not_customer", "non_company_entity", "manufacturer_when_distributor_requested", "clinic_excluded", "region_mismatch_confirmed")):
+    if "matches_exclusion" in goal_flags or any(flag in goal_flags for flag in ("directory_not_customer", "media_not_customer", "non_company_entity", "manufacturer_when_distributor_requested", "clinic_excluded", "dental_when_medical_requested", "medical_when_dental_requested", "region_mismatch_confirmed")):
         item["candidate_status"] = "excluded_by_goal"
     elif penalties >= 40:
         item["candidate_status"] = "low_relevance_social" if _looks_like_low_relevance_social(item) else "excluded_by_rule"

@@ -63,6 +63,38 @@ def test_goal_guard_demotes_manufacturer_for_distributor_task():
     assert "manufacturer_when_distributor_requested" in manufacturer["goal_drift_flags"]
 
 
+def test_goal_guard_keeps_medical_cssd_channel_above_dental_channel_for_medical_task():
+    rows = [
+        {
+            "title": "Brazil Dental Dealer",
+            "link": "https://dental-dealer.example",
+            "source": "tavily",
+            "snippet": "Dental equipment distributor and dental supplies dealer with email and phone.",
+        },
+        {
+            "title": "Sterimed Hospital Supplies Brazil",
+            "link": "https://sterimed.example",
+            "source": "tavily",
+            "snippet": "Medical consumables distributor and CSSD sterilization products supplier for hospitals.",
+        },
+    ]
+
+    candidates = build_candidate_pool(
+        rows,
+        target_final_leads=1,
+        customer_types=["medical consumables distributor", "CSSD supplier"],
+        product_keywords=["sterilization indicator tape", "chemical indicator"],
+        target_regions=["Brazil"],
+        exclusions=["dental equipment distributor"],
+    )
+
+    assert candidates[0]["company_name"] == "Sterimed Hospital Supplies Brazil"
+    assert candidates[0]["target_type"] in {"medical_consumables_distributor", "cssd_supplier"}
+    dental = next(item for item in candidates if item["company_name"] == "Brazil Dental Dealer")
+    assert dental["candidate_status"] == "excluded_by_goal"
+    assert dental["target_type_fit_score"] < candidates[0]["target_type_fit_score"]
+
+
 def test_goal_guard_keeps_complete_contacts_as_bonus_not_primary_rank():
     rows = [
         {

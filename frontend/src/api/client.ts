@@ -21,6 +21,16 @@ export interface HuntRequest {
   website_url: string;
   description: string;
   product_keywords: string[];
+  product_department?: "dental" | "medical_consumables" | "unclear";
+  product_category?:
+    | "dental_teaching_lab"
+    | "dental_equipment"
+    | "dental_consumables"
+    | "medical_ppe_consumables"
+    | "surgical_packs"
+    | "cssd_sterilization"
+    | "general_hospital_consumables"
+    | "unclear";
   target_customer_profile: string;
   uploaded_file_ids: string[];
   target_regions: string[];
@@ -39,6 +49,18 @@ export interface HuntCopilotStrategy {
   target_regions: string[];
   customer_types: string[];
   product_keywords: string[];
+  product_department: "dental" | "medical_consumables" | "unclear";
+  product_category:
+    | "dental_teaching_lab"
+    | "dental_equipment"
+    | "dental_consumables"
+    | "medical_ppe_consumables"
+    | "surgical_packs"
+    | "cssd_sterilization"
+    | "general_hospital_consumables"
+    | "unclear";
+  application_scenarios: string[];
+  business_notes: string[];
   exclusions: string[];
   hard_filters: {
     require_instagram: boolean;
@@ -72,6 +94,10 @@ export interface HuntCopilotStrategy {
   product_knowledge_refs: string[];
   product_knowledge_notes: string[];
   product_knowledge_summary: string;
+  field_sources: Record<string, string[]>;
+  field_confidence: Record<string, number>;
+  uncertain_fields: string[];
+  last_extraction: Record<string, unknown>;
   strategy_version: number;
   strategy_confirmed: boolean;
   needs_recheck: boolean;

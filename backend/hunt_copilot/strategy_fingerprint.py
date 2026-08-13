@@ -15,6 +15,8 @@ def strategy_fingerprint(strategy: HuntStrategy) -> str:
         "regions": _norm_list(strategy.target_regions),
         "customers": _norm_list(strategy.customer_types),
         "products": _norm_list(strategy.product_keywords),
+        "department": strategy.product_department,
+        "category": strategy.product_category,
         "exclusions": _norm_list(strategy.exclusions),
         "required": _norm_list(strategy.hard_filters.enabled_labels()),
         "final_leads": int(strategy.budget.final_leads),
@@ -29,9 +31,11 @@ def strategy_similarity(left: HuntStrategy, right: HuntStrategy) -> float:
         _jaccard(_norm_list(left.target_regions), _norm_list(right.target_regions)),
         _jaccard(_norm_list(left.customer_types), _norm_list(right.customer_types)),
         _jaccard(_norm_list(left.product_keywords), _norm_list(right.product_keywords)),
+        1.0 if left.product_department == right.product_department else 0.0,
+        1.0 if left.product_category == right.product_category else 0.0,
         _jaccard(_norm_list(left.hard_filters.enabled_labels()), _norm_list(right.hard_filters.enabled_labels())),
     ]
-    weights = [0.3, 0.3, 0.25, 0.15]
+    weights = [0.24, 0.24, 0.2, 0.12, 0.08, 0.12]
     return round(sum(score * weight for score, weight in zip(scores, weights, strict=False)), 3)
 
 
@@ -40,6 +44,8 @@ def canonical_strategy_terms(strategy: HuntStrategy) -> dict[str, list[str]]:
         "regions": _norm_list(strategy.target_regions),
         "customers": _norm_list(strategy.customer_types),
         "products": _norm_list(strategy.product_keywords),
+        "department": [strategy.product_department],
+        "category": [strategy.product_category],
         "exclusions": _norm_list(strategy.exclusions),
         "required": _norm_list(strategy.hard_filters.enabled_labels()),
     }

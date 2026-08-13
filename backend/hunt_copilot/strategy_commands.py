@@ -69,6 +69,8 @@ FIELD_LABELS = {
     "target_regions": "目标地区",
     "customer_types": "目标客户",
     "product_keywords": "产品关键词",
+    "application_scenarios": "应用场景",
+    "business_notes": "业务说明",
     "exclusions": "排除对象",
     "hard_filters": "硬条件",
     "preferred_fields": "优先字段",

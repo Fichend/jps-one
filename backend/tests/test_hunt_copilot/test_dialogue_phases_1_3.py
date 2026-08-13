@@ -99,12 +99,57 @@ def test_complete_requirement_is_saved_without_catalogue_keyword_pollution(tmp_p
     persisted = service.get(session.session_id)
 
     assert persisted.strategy.target_regions == ["Brazil"]
-    assert persisted.strategy.customer_types == ["distributor"]
+    assert persisted.strategy.customer_types == ["medical consumables distributor", "CSSD supplier"]
+    assert persisted.strategy.product_department == "medical_consumables"
+    assert persisted.strategy.product_category == "cssd_sterilization"
     assert persisted.strategy.product_keywords == ["灭菌耗材"]
     assert persisted.strategy.exclusions == ["clinic"]
     assert persisted.strategy.hard_filters.require_email is True
     assert persisted.strategy.hard_filters.require_website is True
-    assert "实际修改如下" in assistant
+    assert "当前已记录" in assistant
+
+
+def test_cssd_business_context_is_not_product_keyword(tmp_path):
+    service = _service(tmp_path)
+
+    session, assistant = service.start("客户是cssd的潜在客户，例如经销商 代理商")
+
+    assert session.strategy.customer_types == ["medical consumables distributor", "CSSD supplier"]
+    assert session.strategy.product_department == "medical_consumables"
+    assert session.strategy.product_category == "cssd_sterilization"
+    assert session.strategy.application_scenarios == ["CSSD"]
+    assert session.strategy.product_keywords == []
+    assert any("cssd" in note.lower() for note in session.strategy.business_notes)
+    assert "CSSD" in assistant
+    assert "产品关键词" in assistant or "JPS 产品" in assistant
+
+
+def test_medical_consumables_cssd_task_locks_department_and_exclusions(tmp_path):
+    service = _service(tmp_path)
+
+    session, _ = service.start(
+        "我要找巴西医疗耗材经销商和进口商，产品是 Sterilization Indicator Tapes、Indicator Labels、Chemical Indicators、Sterilization Reels、Crepe Paper、Nonwoven Wrapping Materials，应用场景是 CSSD 和医院消毒供应中心，排除牙科学校、牙科诊所和牙科设备经销商。候选池 80 个，最终推荐 20 个。"
+    )
+
+    assert session.strategy.product_department == "medical_consumables"
+    assert session.strategy.product_category == "cssd_sterilization"
+    assert session.strategy.customer_types == ["medical consumables distributor", "medical consumables importer", "CSSD supplier"]
+    assert session.strategy.exclusions == ["dental school", "dental equipment distributor", "general dental clinic"]
+    assert "distributor" not in session.strategy.exclusions
+    assert session.strategy.budget.max_candidates == 80
+    assert session.strategy.budget.final_leads == 20
+    assert "dental simulator" not in session.strategy.product_keywords
+
+
+def test_excluded_country_does_not_become_target_region(tmp_path):
+    service = _service(tmp_path)
+
+    session, _ = service.start("巴西 cssd sterilization 经销商代理商 排除 Spain")
+
+    assert session.strategy.target_regions == ["Brazil"]
+    assert "Spain" in session.strategy.exclusions
+    assert session.strategy.application_scenarios == ["CSSD"]
+    assert "sterilization" in session.strategy.product_keywords
 
 
 def test_catalogue_only_recommends_when_user_did_not_supply_product(tmp_path):
@@ -114,6 +159,18 @@ def test_catalogue_only_recommends_when_user_did_not_supply_product(tmp_path):
 
     assert session.strategy.product_keywords == []
     assert "建议关键词" in session.strategy.product_knowledge_summary
+
+
+def test_uncertain_fields_clear_after_missing_slots_are_filled(tmp_path):
+    service = _service(tmp_path)
+
+    session, _ = service.start("找泰国牙科学校，必须有官网邮箱")
+    assert "product_keywords" in session.strategy.uncertain_fields
+
+    session, _ = service.send(session.session_id, "只要 dental simulator")
+
+    assert session.strategy.product_keywords == ["dental simulator"]
+    assert "product_keywords" not in session.strategy.uncertain_fields
 
 
 @pytest.mark.parametrize(

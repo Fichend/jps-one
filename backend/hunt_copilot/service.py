@@ -13,9 +13,6 @@ from config.settings import Settings, get_settings
 from hunt_copilot.conversation_host import ConversationHost
 from hunt_copilot.conversation_guide import is_light_smalltalk, suggested_replies
 from hunt_copilot.conversation_router import ConversationRouter
-from hunt_copilot.llm_planner import HuntCopilotLLMPlanner
-from hunt_copilot.patch_merger import StrategyPatchMerger
-from hunt_copilot.planner import render_strategy_card
 from hunt_copilot.response_builder import CopilotResponseBuilder
 from hunt_copilot.schemas import (
     ChannelStatus,
@@ -30,6 +27,7 @@ from hunt_copilot.schemas import (
 from hunt_copilot.skill_selector import SearchSkillSelector
 from hunt_copilot.state_machine import allowed_actions, choose_state
 from hunt_copilot.store import HuntCopilotStore
+from hunt_copilot.strategy_renderer import render_strategy_card
 from hunt_copilot.strategy_fingerprint import strategy_fingerprint, strategy_similarity
 from hunt_copilot.strategy_critic import StrategyCritic
 from hunt_copilot.strategy_commands import (
@@ -42,6 +40,8 @@ from hunt_copilot.strategy_commands import (
     parse_strategy_command,
 )
 from hunt_copilot.validator import StrategyValidator
+from hunt_copilot_ai import CopilotAIOrchestrator
+from product_knowledge.taxonomy import CATEGORY_LABELS, DEPARTMENT_LABELS, UNCLEAR, direction_summary
 from search_tools import list_tool_status
 from tool_executor import ToolExecutor, build_tool_plan
 
@@ -59,13 +59,12 @@ class HuntCopilotService:
         self.store = store or HuntCopilotStore()
         self.conversation_router = ConversationRouter(self.settings)
         self.conversation_host = ConversationHost()
-        self.llm_planner = HuntCopilotLLMPlanner(self.settings)
-        self.patch_merger = StrategyPatchMerger()
         self.validator = StrategyValidator(self.settings)
         self.skill_selector = SearchSkillSelector()
         self.critic = StrategyCritic(self.settings)
         self.response_builder = CopilotResponseBuilder()
         self.tool_executor = ToolExecutor(self.settings)
+        self.ai_orchestrator = CopilotAIOrchestrator(self.settings)
 
     def start(self, message: str) -> tuple[CopilotSession, str]:
         session = CopilotSession(
@@ -152,6 +151,7 @@ class HuntCopilotService:
 
         self._push_snapshot(session, before, raw_message)
         session.strategy = application.strategy
+        self._sync_strategy_uncertainty(session.strategy)
         session.detected_conflicts = []
         session.recent_strategy_changes = _strategy_changes(before, session.strategy)
         session.selected_skill = self.skill_selector.select(text=raw_message, strategy=session.strategy)
@@ -179,14 +179,20 @@ class HuntCopilotService:
 
     def _execute_planner_change(self, session: CopilotSession, message: str) -> tuple[CopilotSession, str]:
         before = session.strategy.model_copy(deep=True)
-        planner_response = self.llm_planner.plan(message, before, session.state.value, **self._planner_context(session))
-        expected = self.patch_merger.merge(before, planner_response.strategy_patch, raw_message=message)
-        changed = not business_fields_equal(before, expected)
+        result = self.ai_orchestrator.handle_message(
+            message,
+            before,
+            state=session.state.value,
+            **self._planner_context(session),
+        )
+        expected = result.strategy
+        changed = result.changed or not business_fields_equal(before, expected)
         if changed:
             self._push_snapshot(session, before, message)
         session.strategy = expected
-        session.detected_conflicts = planner_response.detected_conflicts
-        session.recent_strategy_changes = _strategy_changes(before, expected)
+        self._sync_strategy_uncertainty(session.strategy)
+        session.detected_conflicts = result.detected_conflicts
+        session.recent_strategy_changes = result.recent_strategy_changes or _strategy_changes(before, expected)
         session.selected_skill = self.skill_selector.select(text=message, strategy=expected)
         session.preview = None if changed else session.preview
         if changed and session.state == CopilotState.CHANNEL_CHECK_FAILED:
@@ -196,10 +202,7 @@ class HuntCopilotService:
         self.store.save(session)
 
         persisted = self._verified_session(session.session_id, expected)
-        if changed:
-            assistant = _verified_change_summary(before, persisted.strategy) + "\n" + self._assistant_for_current_state(persisted)
-        else:
-            assistant = "本次没有识别到可保存的策略字段，策略未修改。" + self._assistant_for_current_state(persisted)
+        assistant = result.assistant_message or self._assistant_for_current_state(persisted)
         self._append_assistant(persisted, assistant)
         self._update_memory(persisted, assistant)
         self._touch(persisted)
@@ -218,6 +221,7 @@ class HuntCopilotService:
         restored.strategy_confirmed = False
         restored.needs_recheck = True
         session.strategy = restored
+        self._sync_strategy_uncertainty(session.strategy)
         session.preview = None
         session.detected_conflicts = []
         session.recent_strategy_changes = _strategy_changes(before, restored)
@@ -268,6 +272,7 @@ class HuntCopilotService:
         updated.needs_recheck = True
         self._push_snapshot(session, before, "手动编辑策略卡")
         session.strategy = HuntStrategy.model_validate(updated.model_dump())
+        self._sync_strategy_uncertainty(session.strategy)
         session.detected_conflicts = []
         session.preview = None
         session.selected_skill = self.skill_selector.select(strategy=session.strategy)
@@ -310,6 +315,7 @@ class HuntCopilotService:
         session.strategy.strategy_confirmed = False
         session.strategy.needs_recheck = True
         session.strategy.strategy_version += 1
+        self._sync_strategy_uncertainty(session.strategy)
         session.selected_skill = self.skill_selector.select(strategy=session.strategy)
         self._refresh_controls(session)
         assistant = "已复制历史策略。请检查右侧策略卡，确认后再检查通道和执行。"
@@ -470,6 +476,10 @@ class HuntCopilotService:
             session.tool_plan = build_tool_plan(session.strategy)
             session.tool_execution_preview = self.tool_executor.preview_plan(session.tool_plan)
 
+    def _sync_strategy_uncertainty(self, strategy: HuntStrategy) -> None:
+        validation = self.validator.validate(strategy)
+        strategy.uncertain_fields = list(dict.fromkeys(validation.missing_fields))
+
     def _update_memory(self, session: CopilotSession, assistant: str) -> None:
         validation = self.validator.validate(session.strategy)
         session.clarification_focus = validation.missing_fields[0] if validation.missing_fields else ""
@@ -529,10 +539,16 @@ class HuntCopilotService:
 
     def _hunt_payload(self, strategy: HuntStrategy, request: ConfirmExecutionRequest) -> dict[str, Any]:
         description_parts = [strategy.raw_requirement.strip(), render_strategy_card(strategy)]
+        if strategy.application_scenarios:
+            description_parts.append("应用场景：" + ", ".join(strategy.application_scenarios))
+        if strategy.business_notes:
+            description_parts.append("业务说明：" + "；".join(strategy.business_notes[-5:]))
         return {
             "website_url": "",
             "description": "\n\n".join(part for part in description_parts if part),
             "product_keywords": strategy.product_keywords,
+            "product_department": strategy.product_department,
+            "product_category": strategy.product_category,
             "target_customer_profile": ", ".join(strategy.customer_types),
             "target_regions": strategy.target_regions,
             "uploaded_file_ids": [],
@@ -553,6 +569,10 @@ class HuntCopilotService:
                 "target_regions": strategy.target_regions,
                 "customer_types": strategy.customer_types,
                 "product_keywords": strategy.product_keywords,
+                "product_department": strategy.product_department,
+                "product_category": strategy.product_category,
+                "application_scenarios": strategy.application_scenarios,
+                "business_notes": strategy.business_notes,
                 "exclusions": strategy.exclusions,
                 "candidate_pool_enabled": strategy.rules.candidate_pool_enabled,
                 "merge_multi_source_evidence": strategy.rules.merge_multi_source_evidence,
@@ -651,11 +671,15 @@ def _strategy_changes(before: HuntStrategy, after: HuntStrategy) -> list[str]:
     for field, label in (
         ("target_regions", "目标地区"),
         ("customer_types", "目标客户"),
+        ("product_department", "业务部门"),
+        ("product_category", "产品分类"),
         ("product_keywords", "产品关键词"),
+        ("application_scenarios", "应用场景"),
+        ("business_notes", "业务说明"),
         ("exclusions", "排除对象"),
     ):
         if getattr(before, field) != getattr(after, field):
-            changes.append(f"{label}：{_join_values(getattr(after, field)) or '已清空'}")
+            changes.append(f"{label}：{_render_strategy_value(field, getattr(after, field)) or '已清空'}")
     if before.hard_filters != after.hard_filters:
         changes.append(f"硬条件：{_join_values(after.hard_filters.enabled_labels()) or '未设置'}")
     if before.preferred_fields != after.preferred_fields:
@@ -666,8 +690,13 @@ def _strategy_changes(before: HuntStrategy, after: HuntStrategy) -> list[str]:
 
 
 def _field_values_for_response(strategy: HuntStrategy, field_name: str) -> list[str]:
-    if field_name in {"target_regions", "customer_types", "product_keywords", "exclusions", "preferred_fields"}:
+    if field_name in {"target_regions", "customer_types", "product_keywords", "application_scenarios", "business_notes", "exclusions", "preferred_fields"}:
         return list(getattr(strategy, field_name))
+    if field_name in {"product_department", "product_category"}:
+        value = str(getattr(strategy, field_name) or "")
+        if field_name == "product_department":
+            return [DEPARTMENT_LABELS.get(value, value)]
+        return [CATEGORY_LABELS.get(value, value)]
     if field_name == "hard_filters":
         return strategy.hard_filters.enabled_labels()
     if field_name.startswith("budget."):
@@ -682,7 +711,7 @@ def _field_change_line(field_name: str, before: list[str], after: list[str]) -> 
 
 def _verified_change_summary(before: HuntStrategy, after: HuntStrategy) -> str:
     lines = ["策略已保存并重新读取，实际修改如下："]
-    for field_name in ("target_regions", "customer_types", "product_keywords", "exclusions", "hard_filters", "preferred_fields"):
+    for field_name in ("target_regions", "customer_types", "product_department", "product_category", "product_keywords", "application_scenarios", "business_notes", "exclusions", "hard_filters", "preferred_fields"):
         old_values = _field_values_for_response(before, field_name)
         new_values = _field_values_for_response(after, field_name)
         if old_values != new_values:
@@ -699,6 +728,16 @@ def _verified_change_summary(before: HuntStrategy, after: HuntStrategy) -> str:
 
 def _join_values(values: list[str]) -> str:
     return "、".join(str(item) for item in values if str(item).strip())
+
+
+def _render_strategy_value(field_name: str, value: Any) -> str:
+    if field_name == "product_department":
+        return DEPARTMENT_LABELS.get(str(value or ""), str(value or ""))
+    if field_name == "product_category":
+        return CATEGORY_LABELS.get(str(value or ""), str(value or ""))
+    if isinstance(value, list):
+        return _join_values(value)
+    return str(value or "")
 
 
 def _last_ai_action(session: CopilotSession, assistant: str) -> str:
@@ -720,8 +759,13 @@ def _conversation_summary(session: CopilotSession) -> str:
         parts.append("地区 " + _join_values(strategy.target_regions))
     if strategy.customer_types:
         parts.append("客户 " + _join_values(strategy.customer_types))
+    direction = _direction_text(strategy)
+    if direction:
+        parts.append("搜索方向 " + direction)
     if strategy.product_keywords:
         parts.append("产品 " + _join_values(strategy.product_keywords[:4]))
+    if strategy.application_scenarios:
+        parts.append("应用场景 " + _join_values(strategy.application_scenarios[:3]))
     if strategy.exclusions:
         parts.append("排除 " + _join_values(strategy.exclusions))
     required = strategy.hard_filters.enabled_labels()
@@ -738,10 +782,12 @@ def _opening_message() -> str:
 
 def _confirmed_summary(strategy: HuntStrategy) -> str:
     required = "、".join(strategy.hard_filters.enabled_labels()) or "未设置"
+    direction = _direction_text(strategy) or "待确认"
     return (
         "好的，策略卡已确认："
         f"目标地区 {', '.join(strategy.target_regions)}；"
         f"目标客户 {', '.join(strategy.customer_types)}；"
+        f"搜索方向 {direction}；"
         f"排除 {', '.join(strategy.exclusions) or '无'}；"
         f"产品关键词 {', '.join(strategy.product_keywords)}；"
         f"硬条件 {required}。下一步请点击通道检查，通过后再决定是否正式执行。"
@@ -753,10 +799,18 @@ def _current_strategy_summary(strategy: HuntStrategy) -> str:
         "当前策略卡（仅展示，未修改）："
         f"目标地区 {_join_values(strategy.target_regions) or '未设置'}；"
         f"目标客户 {_join_values(strategy.customer_types) or '未设置'}；"
+        f"搜索方向 {_direction_text(strategy) or '未设置'}；"
         f"产品关键词 {_join_values(strategy.product_keywords) or '未设置'}；"
+        f"应用场景 {_join_values(strategy.application_scenarios) or '未设置'}；"
         f"排除对象 {_join_values(strategy.exclusions) or '无'}；"
         f"硬条件 {_join_values(strategy.hard_filters.enabled_labels()) or '未设置'}；"
         f"候选数量 {strategy.budget.max_candidates}；"
         f"最终数量 {strategy.budget.final_leads}；"
         f"正式预算 {strategy.budget.total_usd:g} USD。"
     )
+
+
+def _direction_text(strategy: HuntStrategy) -> str:
+    if strategy.product_department == UNCLEAR and strategy.product_category == UNCLEAR:
+        return ""
+    return direction_summary(strategy.product_department, strategy.product_category)
